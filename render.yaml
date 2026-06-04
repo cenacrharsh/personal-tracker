@@ -1,0 +1,20 @@
+# Render Blueprint for the Express API. Import via Render → New → Blueprint.
+# Values marked `sync: false` are NOT stored in git — set them in the Render dashboard.
+services:
+  - type: web
+    name: portfolio-tracker-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI # MongoDB Atlas connection string
+        sync: false
+      - key: JWT_SECRET # long random string
+        sync: false
+      - key: FRONTEND_URL # your Vercel production URL, e.g. https://portfolio-tracker.vercel.app
+        sync: false

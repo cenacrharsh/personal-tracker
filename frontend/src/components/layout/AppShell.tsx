@@ -1,13 +1,14 @@
 import type { ReactNode } from "react"
-import { CreditCard, LayoutDashboard, ListChecks, Settings, Wallet } from "lucide-react"
+import { CreditCard, Dumbbell, LayoutDashboard, ListChecks, Settings, Wallet } from "lucide-react"
 
-export type NavKey = "overview" | "holdings" | "cards" | "bills" | "settings"
+export type NavKey = "overview" | "holdings" | "cards" | "bills" | "trackers" | "settings"
 
 const NAV: { key: NavKey; label: string; icon: typeof LayoutDashboard }[] = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "holdings", label: "Holdings", icon: Wallet },
   { key: "cards", label: "Cards", icon: CreditCard },
   { key: "bills", label: "Bills", icon: ListChecks },
+  { key: "trackers", label: "Trackers", icon: Dumbbell },
   { key: "settings", label: "Settings", icon: Settings },
 ]
 
@@ -73,7 +74,7 @@ export function AppShell({
 
       {/* Mobile bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-background/85 backdrop-blur-md md:hidden">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {NAV.map(({ key, label, icon: Icon }) => {
             const isActive = key === active
             return (

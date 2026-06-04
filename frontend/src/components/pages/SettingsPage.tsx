@@ -1,3 +1,5 @@
+import { useState } from "react"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -5,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NumberInput } from "@/components/forms/NumberInput"
 import { usePortfolioStore } from "@/store/usePortfolioStore"
+import { useAuthStore } from "@/store/useAuthStore"
+import { importLocalData } from "@/lib/importLocalData"
 
 export function SettingsPage() {
   const {
@@ -21,14 +25,74 @@ export function SettingsPage() {
     reset,
   } = usePortfolioStore()
 
+  const user = useAuthStore((s) => s.user)
+  const logout = useAuthStore((s) => s.logout)
+
+  const [importState, setImportState] = useState<"idle" | "busy" | "done" | "empty" | "error">("idle")
+
+  const onImport = async () => {
+    if (!confirm("Import data saved in this browser into your account? This overwrites your current account data.")) return
+    setImportState("busy")
+    try {
+      const { imported } = await importLocalData()
+      setImportState(imported ? "done" : "empty")
+      if (imported) window.location.reload()
+    } catch {
+      setImportState("error")
+    }
+  }
+
+  const onLogout = async () => {
+    await logout()
+    window.location.reload()
+  }
+
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Profile, allocation rules, insurance and account reset.
+          Profile, allocation rules, insurance and account.
         </p>
       </header>
+
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="text-base">Account</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-medium">{user?.name ?? "—"}</div>
+            <div className="text-xs text-muted-foreground">{user?.email ?? ""}</div>
+          </div>
+          <Button variant="outline" onClick={onLogout}>
+            Log out
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="text-base">Import from this browser</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            If you used this app before signing in, your data was stored locally in this browser.
+            Import it once to move it into your account.
+          </p>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={onImport} disabled={importState === "busy"}>
+              {importState === "busy" ? "Importing…" : "Import local data"}
+            </Button>
+            {importState === "empty" && (
+              <span className="text-xs text-muted-foreground">No local data found in this browser.</span>
+            )}
+            {importState === "error" && (
+              <span className="text-xs text-rose-400">Import failed. Is the backend running?</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="rounded-2xl">
         <CardHeader>

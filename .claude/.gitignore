@@ -1,0 +1,3 @@
+# Track shared .claude config (skills, agents, shared settings).
+# Keep personal/per-machine settings out of git.
+settings.local.json

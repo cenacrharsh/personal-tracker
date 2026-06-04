@@ -4,6 +4,7 @@ import type {
   CreditCardsData,
   PortfolioData,
   Snapshot,
+  TrackersData,
 } from "./types"
 import type { PortfolioRepository } from "./repository"
 
@@ -11,6 +12,7 @@ const KEY_PORTFOLIO = "pt:portfolio"
 const KEY_CARDS = "pt:cards"
 const KEY_SNAPSHOTS = "pt:snapshots"
 const KEY_BILLS = "pt:bills"
+const KEY_TRACKERS = "pt:trackers"
 const LEGACY_KEY = "portfolio-tracker"
 const MAX_SNAPSHOTS = 730
 
@@ -163,10 +165,19 @@ export class LocalStorageAdapter implements PortfolioRepository {
     writeJSON(KEY_BILLS, data)
   }
 
+  async getTrackers(): Promise<TrackersData | null> {
+    return readJSON<TrackersData>(KEY_TRACKERS)
+  }
+
+  async saveTrackers(data: TrackersData): Promise<void> {
+    writeJSON(KEY_TRACKERS, data)
+  }
+
   async reset(): Promise<void> {
     localStorage.removeItem(KEY_PORTFOLIO)
     localStorage.removeItem(KEY_CARDS)
     localStorage.removeItem(KEY_SNAPSHOTS)
     localStorage.removeItem(KEY_BILLS)
+    localStorage.removeItem(KEY_TRACKERS)
   }
 }
