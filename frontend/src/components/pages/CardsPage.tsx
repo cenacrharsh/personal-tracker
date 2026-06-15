@@ -519,7 +519,7 @@ function OverviewView({
                   <div className="font-medium text-emerald-300">{formatCompactINR(s.cashback)}</div>
                 </div>
               </div>
-              {s.card.feeWaiverTarget > 0 ? (
+              {s.card.annualFeeType === "paid" && s.card.feeWaiverTarget > 0 ? (
                 <div className="mt-3">
                   <div className="mb-1 flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground">Fee waiver</span>
@@ -530,7 +530,9 @@ function OverviewView({
                   <Progress value={s.waiverProgress} className="h-1.5" />
                 </div>
               ) : (
-                <div className="mt-3 text-[11px] text-muted-foreground">No waiver target</div>
+                <div className="mt-3 text-[11px] text-muted-foreground">
+                  {s.card.annualFeeType === "ltf" ? "Lifetime free · no fee" : "No waiver target"}
+                </div>
               )}
             </button>
           ))}
@@ -724,7 +726,7 @@ function SingleCardView({
         </CardContent>
       </Card>
 
-      {card.feeWaiverTarget > 0 ? (
+      {card.annualFeeType === "paid" ? (
         <Card className="rounded-2xl border-border/60 bg-card/85">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Fee waiver progress</CardTitle>
@@ -733,22 +735,47 @@ function SingleCardView({
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex flex-wrap items-end justify-between gap-2">
+            {card.feeWaiverTarget > 0 ? (
+              <>
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <div className="text-2xl font-semibold">{formatINR(summary.annivSpend)}</div>
+                    <div className="text-xs text-muted-foreground">Spent of {formatINR(card.feeWaiverTarget)} target</div>
+                  </div>
+                  <div className={`flex items-center gap-1.5 text-sm font-medium ${summary.waiverGap <= 0 ? "text-emerald-300" : "text-amber-300"}`}>
+                    {summary.waiverGap <= 0 ? <CheckCircle2 className="size-4" /> : null}
+                    {summary.waiverGap <= 0
+                      ? `Target reached by ${formatCompactINR(Math.abs(summary.waiverGap))}`
+                      : `${formatCompactINR(summary.waiverGap)} more to waive fee`}
+                  </div>
+                </div>
+                <Progress value={summary.waiverProgress} className="h-2" />
+              </>
+            ) : (
               <div>
                 <div className="text-2xl font-semibold">{formatINR(summary.annivSpend)}</div>
-                <div className="text-xs text-muted-foreground">Spent of {formatINR(card.feeWaiverTarget)} target</div>
+                <div className="text-xs text-muted-foreground">
+                  Spent this anniversary year · set a fee-waiver target in “Card profiles” to track progress.
+                </div>
               </div>
-              <div className={`flex items-center gap-1.5 text-sm font-medium ${summary.waiverGap <= 0 ? "text-emerald-300" : "text-amber-300"}`}>
-                {summary.waiverGap <= 0 ? <CheckCircle2 className="size-4" /> : null}
-                {summary.waiverGap <= 0
-                  ? `Target reached by ${formatCompactINR(Math.abs(summary.waiverGap))}`
-                  : `${formatCompactINR(summary.waiverGap)} more to waive fee`}
-              </div>
-            </div>
-            <Progress value={summary.waiverProgress} className="h-2" />
+            )}
           </CardContent>
         </Card>
-      ) : null}
+      ) : (
+        <Card className="rounded-2xl border-border/60 bg-card/85">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">Lifetime Free</CardTitle>
+              <span className="rounded-full bg-yellow-400/25 px-2 py-0.5 text-[10px] text-yellow-300">LTF</span>
+            </div>
+            <div className="text-xs text-muted-foreground">No annual fee — no spend target to track.</div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-semibold">{formatINR(summary.spend)}</div>
+            <div className="text-xs text-muted-foreground">Spent in {year}</div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="rounded-2xl border-border/60 bg-card/85">
         <CardHeader className="pb-2">

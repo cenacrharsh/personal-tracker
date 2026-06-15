@@ -2,6 +2,7 @@ import "dotenv/config"
 import express from "express"
 import cors from "cors"
 import cookieParser from "cookie-parser"
+import mongoose from "mongoose"
 
 import { connectDb } from "./db.js"
 import { requireAuth } from "./middleware/auth.js"
@@ -31,7 +32,17 @@ app.use(cors({ origin: corsOrigin, credentials: true }))
 app.use(express.json({ limit: "2mb" }))
 app.use(cookieParser())
 
-app.get("/api/health", (req, res) => res.json({ ok: true }))
+// Liveness check. Plain call only proves the web server is awake.
+// `?db=1` also pings MongoDB so a single keep-alive request keeps Atlas warm too.
+app.get("/api/health", async (req, res) => {
+  if (req.query.db === undefined) return res.json({ ok: true })
+  try {
+    await mongoose.connection.db.admin().ping()
+    res.json({ ok: true, db: "up" })
+  } catch {
+    res.status(503).json({ ok: false, db: "down" })
+  }
+})
 
 app.use("/api/auth", authRoutes)
 

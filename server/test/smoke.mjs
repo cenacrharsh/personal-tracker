@@ -40,8 +40,14 @@ for (let i = 0; i < 50; i++) {
   await new Promise((r) => setTimeout(r, 100))
 }
 
+// 0. health endpoints (public)
+let r = await call("/health")
+assert(r.status === 200 && r.json.ok === true, "plain health returns ok")
+r = await call("/health?db=1")
+assert(r.status === 200 && r.json.ok === true && r.json.db === "up", "health?db=1 pings the database")
+
 // 1. unauthenticated access is blocked
-let r = await call("/portfolio")
+r = await call("/portfolio")
 assert(r.status === 401, "unauthenticated portfolio GET is 401")
 
 // 2. signup

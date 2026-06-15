@@ -167,13 +167,6 @@ export function TrackersPage() {
   const ActiveIcon = activeDef.icon
   const activeEntries = activeActivity === "gym" ? gym.entries : badminton.entries
 
-  // Which activity (if any) owns a given day. Activities don't share days.
-  const dayActivity = (key: string): ActivityKey | null => {
-    if (isActiveDay("gym", key)) return "gym"
-    if (isActiveDay("badminton", key)) return "badminton"
-    return null
-  }
-
   const weekDates = getWeekDates(weekStart)
   const weekKeys = weekDates.map(toDateKey)
   const weekCount = datesInRange(activeActivity, weekKeys[0], weekKeys[6]).length
@@ -305,8 +298,7 @@ export function TrackersPage() {
             {weekDates.map((date, i) => {
               const key = weekKeys[i]
               const isToday = key === today
-              const owner = dayActivity(key)
-              const ownerDef = owner ? ACTIVITIES[owner] : null
+              const on = isActiveDay(activeActivity, key)
               const isFuture = key > today
 
               return (
@@ -315,8 +307,8 @@ export function TrackersPage() {
                   onClick={() => !isFuture && toggleDay(activeActivity, key)}
                   disabled={isFuture}
                   className={`flex flex-col items-center gap-1.5 rounded-xl py-3 transition-all duration-150 ${
-                    ownerDef
-                      ? `${ownerDef.dot} text-white shadow-lg ${ownerDef.dotShadow} scale-105`
+                    on
+                      ? `${activeDef.dot} text-white shadow-lg ${activeDef.dotShadow} scale-105`
                       : isFuture
                         ? "cursor-not-allowed opacity-30"
                         : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
@@ -325,10 +317,10 @@ export function TrackersPage() {
                   <span className="text-[10px] font-semibold uppercase tracking-wider opacity-70">
                     {DAY_LABELS[i]}
                   </span>
-                  <span className={`text-base font-bold ${isToday && !ownerDef ? activeDef.text : ""}`}>
+                  <span className={`text-base font-bold ${isToday && !on ? activeDef.text : ""}`}>
                     {date.getDate()}
                   </span>
-                  <span className={`size-1.5 rounded-full ${ownerDef ? "bg-white/70" : isToday ? activeDef.dot : "bg-transparent"}`} />
+                  <span className={`size-1.5 rounded-full ${on ? "bg-white/70" : isToday ? activeDef.dot : "bg-transparent"}`} />
                 </button>
               )
             })}
@@ -404,10 +396,19 @@ export function TrackersPage() {
               {row.map((date, di) => {
                 if (!date) return <div key={di} />
                 const key = toDateKey(date)
-                const owner = dayActivity(key)
-                const ownerDef = owner ? ACTIVITIES[owner] : null
+                const gymOn = isActiveDay("gym", key)
+                const badmintonOn = isActiveDay("badminton", key)
+                const marked = gymOn || badmintonOn
                 const isToday = key === today
                 const isFuture = key > today
+
+                // Solid circle for one activity, split green/blue when both are logged.
+                const circleBg =
+                  gymOn && badmintonOn
+                    ? "linear-gradient(135deg, #22c55e 0 50%, #0ea5e9 50% 100%)"
+                    : gymOn
+                      ? "#22c55e"
+                      : "#0ea5e9"
 
                 return (
                   <button
@@ -415,7 +416,7 @@ export function TrackersPage() {
                     onClick={() => !isFuture && toggleDay(activeActivity, key)}
                     disabled={isFuture}
                     className={`relative flex h-9 w-full items-center justify-center rounded-lg text-sm font-medium transition-all duration-150 sm:h-10 ${
-                      ownerDef
+                      marked
                         ? "text-foreground"
                         : isToday
                           ? `ring-2 ${activeDef.ring} ring-offset-1 ring-offset-background text-foreground hover:bg-white/10`
@@ -424,8 +425,11 @@ export function TrackersPage() {
                             : "text-muted-foreground hover:bg-white/10 hover:text-foreground"
                     }`}
                   >
-                    {ownerDef ? (
-                      <span className={`flex size-8 items-center justify-center rounded-full text-white shadow-md ${ownerDef.dot}`}>
+                    {marked ? (
+                      <span
+                        className="flex size-8 items-center justify-center rounded-full text-white shadow-md"
+                        style={{ background: circleBg }}
+                      >
                         {date.getDate()}
                       </span>
                     ) : (
