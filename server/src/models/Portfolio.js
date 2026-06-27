@@ -1,6 +1,7 @@
 import mongoose from "mongoose"
 
 const insurance = {
+  enabled: { type: Boolean, default: true },
   coverAmount: { type: Number, default: 0 },
   premium: { type: Number, default: 0 },
   renewalDate: { type: String, default: "2030-01-01" },

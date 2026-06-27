@@ -124,74 +124,100 @@ export function SettingsPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card className="rounded-2xl">
           <CardHeader>
-            <CardTitle className="text-base">Life Insurance</CardTitle>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-base">Life Insurance</CardTitle>
+              <Switch
+                checked={lifeInsurance.enabled}
+                onCheckedChange={(v) => setLifeInsurance({ enabled: v })}
+                aria-label="Enable life insurance"
+              />
+            </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid gap-2">
-              <Label className="text-xs text-muted-foreground">Cover Amount (INR)</Label>
-              <NumberInput
-                value={lifeInsurance.coverAmount}
-                onChange={(v) => setLifeInsurance({ coverAmount: v })}
-                min={0}
-                step={50000}
-                ariaLabel="Life insurance cover"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label className="text-xs text-muted-foreground">Premium (INR)</Label>
-              <NumberInput
-                value={lifeInsurance.premium}
-                onChange={(v) => setLifeInsurance({ premium: v })}
-                min={0}
-                step={500}
-                ariaLabel="Life insurance premium"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label className="text-xs text-muted-foreground">Renewal Date</Label>
-              <Input
-                type="date"
-                value={lifeInsurance.renewalDate}
-                onChange={(e) => setLifeInsurance({ renewalDate: e.target.value })}
-              />
-            </div>
-          </CardContent>
+          {lifeInsurance.enabled ? (
+            <CardContent className="space-y-3">
+              <div className="grid gap-2">
+                <Label className="text-xs text-muted-foreground">Cover Amount (INR)</Label>
+                <NumberInput
+                  value={lifeInsurance.coverAmount}
+                  onChange={(v) => setLifeInsurance({ coverAmount: v })}
+                  min={0}
+                  step={50000}
+                  ariaLabel="Life insurance cover"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-xs text-muted-foreground">Premium (INR)</Label>
+                <NumberInput
+                  value={lifeInsurance.premium}
+                  onChange={(v) => setLifeInsurance({ premium: v })}
+                  min={0}
+                  step={500}
+                  ariaLabel="Life insurance premium"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-xs text-muted-foreground">Renewal Date</Label>
+                <Input
+                  type="date"
+                  value={lifeInsurance.renewalDate}
+                  onChange={(e) => setLifeInsurance({ renewalDate: e.target.value })}
+                />
+              </div>
+            </CardContent>
+          ) : (
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Turned off — hidden from Overview and Bills.</p>
+            </CardContent>
+          )}
         </Card>
 
         <Card className="rounded-2xl">
           <CardHeader>
-            <CardTitle className="text-base">Health Insurance</CardTitle>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-base">Health Insurance</CardTitle>
+              <Switch
+                checked={healthInsurance.enabled}
+                onCheckedChange={(v) => setHealthInsurance({ enabled: v })}
+                aria-label="Enable health insurance"
+              />
+            </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid gap-2">
-              <Label className="text-xs text-muted-foreground">Cover Amount (INR)</Label>
-              <NumberInput
-                value={healthInsurance.coverAmount}
-                onChange={(v) => setHealthInsurance({ coverAmount: v })}
-                min={0}
-                step={50000}
-                ariaLabel="Health insurance cover"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label className="text-xs text-muted-foreground">Premium (INR)</Label>
-              <NumberInput
-                value={healthInsurance.premium}
-                onChange={(v) => setHealthInsurance({ premium: v })}
-                min={0}
-                step={500}
-                ariaLabel="Health insurance premium"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label className="text-xs text-muted-foreground">Renewal Date</Label>
-              <Input
-                type="date"
-                value={healthInsurance.renewalDate}
-                onChange={(e) => setHealthInsurance({ renewalDate: e.target.value })}
-              />
-            </div>
-          </CardContent>
+          {healthInsurance.enabled ? (
+            <CardContent className="space-y-3">
+              <div className="grid gap-2">
+                <Label className="text-xs text-muted-foreground">Cover Amount (INR)</Label>
+                <NumberInput
+                  value={healthInsurance.coverAmount}
+                  onChange={(v) => setHealthInsurance({ coverAmount: v })}
+                  min={0}
+                  step={50000}
+                  ariaLabel="Health insurance cover"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-xs text-muted-foreground">Premium (INR)</Label>
+                <NumberInput
+                  value={healthInsurance.premium}
+                  onChange={(v) => setHealthInsurance({ premium: v })}
+                  min={0}
+                  step={500}
+                  ariaLabel="Health insurance premium"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-xs text-muted-foreground">Renewal Date</Label>
+                <Input
+                  type="date"
+                  value={healthInsurance.renewalDate}
+                  onChange={(e) => setHealthInsurance({ renewalDate: e.target.value })}
+                />
+              </div>
+            </CardContent>
+          ) : (
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Turned off — hidden from Overview and Bills.</p>
+            </CardContent>
+          )}
         </Card>
       </div>
 

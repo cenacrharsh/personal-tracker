@@ -46,8 +46,8 @@ export const DEFAULT_PORTFOLIO: PortfolioData = {
   rdAmount: 0,
   epfPpfAmount: 0,
   currentEmergencyFund: 0,
-  lifeInsurance: { coverAmount: 0, premium: 0, renewalDate: "2030-01-01" },
-  healthInsurance: { coverAmount: 0, premium: 0, renewalDate: "2030-01-01" },
+  lifeInsurance: { enabled: true, coverAmount: 0, premium: 0, renewalDate: "2030-01-01" },
+  healthInsurance: { enabled: true, coverAmount: 0, premium: 0, renewalDate: "2030-01-01" },
 }
 
 export const DEFAULT_CARDS: CreditCardsData = {

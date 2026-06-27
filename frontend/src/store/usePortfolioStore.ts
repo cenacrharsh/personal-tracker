@@ -286,8 +286,14 @@ export const usePortfolioStore = create<PortfolioState>()((set) => ({
       "tata-neu-plus",
     )
 
+    const loadedPortfolio = portfolio ?? DEFAULT_PORTFOLIO
+
     set({
-      ...(portfolio ?? DEFAULT_PORTFOLIO),
+      ...loadedPortfolio,
+      // Older saved data has no `enabled` flag; default it on so existing
+      // insurance stays visible until the user explicitly turns it off.
+      lifeInsurance: { ...loadedPortfolio.lifeInsurance, enabled: loadedPortfolio.lifeInsurance.enabled ?? true },
+      healthInsurance: { ...loadedPortfolio.healthInsurance, enabled: loadedPortfolio.healthInsurance.enabled ?? true },
       creditCards: migratedCards,
       creditCardDataByYear: mergedCardsByYear,
       snapshots,

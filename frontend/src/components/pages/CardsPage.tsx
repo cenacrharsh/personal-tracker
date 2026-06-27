@@ -151,10 +151,17 @@ export function CardsPage() {
         cashback += getMonthValue(creditCardDataByYear, year, card.id, m, "cashback")
       }
 
+      // Anchor the anniversary cycle to the one that overlaps the selected
+      // calendar year the most. For a late anniversary month (Aug–Dec) the
+      // current cycle started the previous year, so start there — otherwise a
+      // November card viewed in 2026 would point at the empty Nov 2026 cycle
+      // instead of the active Nov 2025 → Oct 2026 one.
+      const annivStartYear = card.anniversaryStartMonth >= 8 ? year - 1 : year
       const annivRows: { month: number; year: number; expenses: number; cashback: number }[] = []
       for (let i = 0; i < 12; i += 1) {
-        const month = ((card.anniversaryStartMonth - 1 + i) % 12) + 1
-        const ry = year + (card.anniversaryStartMonth - 1 + i >= 12 ? 1 : 0)
+        const base = card.anniversaryStartMonth - 1 + i
+        const month = (base % 12) + 1
+        const ry = annivStartYear + (base >= 12 ? 1 : 0)
         annivRows.push({
           month,
           year: ry,
@@ -731,7 +738,7 @@ function SingleCardView({
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Fee waiver progress</CardTitle>
             <div className="text-xs text-muted-foreground">
-              Anniversary year starting {MONTHS[card.anniversaryStartMonth - 1]} {year}
+              Anniversary year · {MONTHS[summary.annivRows[0].month - 1]} {summary.annivRows[0].year} – {MONTHS[summary.annivRows[11].month - 1]} {summary.annivRows[11].year}
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -745,7 +752,7 @@ function SingleCardView({
                   <div className={`flex items-center gap-1.5 text-sm font-medium ${summary.waiverGap <= 0 ? "text-emerald-300" : "text-amber-300"}`}>
                     {summary.waiverGap <= 0 ? <CheckCircle2 className="size-4" /> : null}
                     {summary.waiverGap <= 0
-                      ? `Target reached by ${formatCompactINR(Math.abs(summary.waiverGap))}`
+                      ? "Target achieved — fee waived"
                       : `${formatCompactINR(summary.waiverGap)} more to waive fee`}
                   </div>
                 </div>

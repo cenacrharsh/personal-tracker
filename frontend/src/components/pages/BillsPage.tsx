@@ -57,6 +57,15 @@ export function BillsPage() {
   const lifePaid = Boolean(bills.insurance[lifeKey]?.paid)
   const healthPaid = Boolean(bills.insurance[healthKey]?.paid)
 
+  // Show every enabled policy for the selected year. (Disabled policies stay
+  // hidden everywhere.) A premium is only actually *payable* in its renewal
+  // year — other years show a locked, ticked "paid" row for display only.
+  const lifeDue = lifeInsurance.enabled
+  const healthDue = healthInsurance.enabled
+  const showInsurance = lifeDue || healthDue
+  const lifePayable = new Date(lifeInsurance.renewalDate).getFullYear() === year
+  const healthPayable = new Date(healthInsurance.renewalDate).getFullYear() === year
+
   const isThisYear = year === today.getFullYear()
 
   return (
@@ -85,20 +94,24 @@ export function BillsPage() {
           accent="indigo"
           sub={periodLabel}
         />
-        <ProgressTile
-          label="Life insurance"
-          done={lifePaid ? 1 : 0}
-          total={1}
-          accent="indigo"
-          sub={`Renews ${lifeInsurance.renewalDate || "—"}`}
-        />
-        <ProgressTile
-          label="Health insurance"
-          done={healthPaid ? 1 : 0}
-          total={1}
-          accent="rose"
-          sub={`Renews ${healthInsurance.renewalDate || "—"}`}
-        />
+        {lifeDue ? (
+          <ProgressTile
+            label="Life insurance"
+            done={lifePayable ? (lifePaid ? 1 : 0) : 1}
+            total={1}
+            accent="indigo"
+            sub={`Renews ${lifeInsurance.renewalDate || "—"}`}
+          />
+        ) : null}
+        {healthDue ? (
+          <ProgressTile
+            label="Health insurance"
+            done={healthPayable ? (healthPaid ? 1 : 0) : 1}
+            total={1}
+            accent="rose"
+            sub={`Renews ${healthInsurance.renewalDate || "—"}`}
+          />
+        ) : null}
       </div>
 
       {/* Year overview — credit card bills */}
@@ -134,44 +147,52 @@ export function BillsPage() {
         </Card>
       )}
 
-      {/* Insurance checklist (yearly) */}
-      <Card className="rounded-2xl border-border/60 bg-card/85">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheck className="size-4 text-indigo-300" />
-            Insurance premiums · {year}
-          </CardTitle>
-          <div className="text-xs text-muted-foreground">
-            Tap once per calendar year.
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <BillRow
-            paid={lifePaid}
-            onToggle={(next) => setInsuranceBillPaid({ year, type: "life", paid: next })}
-            title="Life insurance"
-            subtitle={
-              lifeInsurance.coverAmount > 0
-                ? `Cover ${formatCompactINR(lifeInsurance.coverAmount)} · renews ${lifeInsurance.renewalDate || "—"}`
-                : "No cover details set — update in Settings"
-            }
-            amount={lifeInsurance.premium > 0 ? formatINR(lifeInsurance.premium) : null}
-            icon={<ShieldCheck className="size-4 text-indigo-300" />}
-          />
-          <BillRow
-            paid={healthPaid}
-            onToggle={(next) => setInsuranceBillPaid({ year, type: "health", paid: next })}
-            title="Health insurance"
-            subtitle={
-              healthInsurance.coverAmount > 0
-                ? `Cover ${formatCompactINR(healthInsurance.coverAmount)} · renews ${healthInsurance.renewalDate || "—"}`
-                : "No cover details set — update in Settings"
-            }
-            amount={healthInsurance.premium > 0 ? formatINR(healthInsurance.premium) : null}
-            icon={<HeartPulse className="size-4 text-rose-300" />}
-          />
-        </CardContent>
-      </Card>
+      {/* Insurance checklist (yearly) — only policies whose renewal falls in this year */}
+      {showInsurance ? (
+        <Card className="rounded-2xl border-border/60 bg-card/85">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShieldCheck className="size-4 text-indigo-300" />
+              Insurance premiums · {year}
+            </CardTitle>
+            <div className="text-xs text-muted-foreground">
+              Tap once per calendar year.
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {lifeDue ? (
+              <BillRow
+                paid={lifePayable ? lifePaid : true}
+                disabled={!lifePayable}
+                onToggle={(next) => setInsuranceBillPaid({ year, type: "life", paid: next })}
+                title="Life insurance"
+                subtitle={
+                  (lifeInsurance.coverAmount > 0
+                    ? `Cover ${formatCompactINR(lifeInsurance.coverAmount)} · renews ${lifeInsurance.renewalDate || "—"}`
+                    : "No cover details set — update in Settings") + (lifePayable ? "" : " · not due this year")
+                }
+                amount={lifeInsurance.premium > 0 ? formatINR(lifeInsurance.premium) : null}
+                icon={<ShieldCheck className="size-4 text-indigo-300" />}
+              />
+            ) : null}
+            {healthDue ? (
+              <BillRow
+                paid={healthPayable ? healthPaid : true}
+                disabled={!healthPayable}
+                onToggle={(next) => setInsuranceBillPaid({ year, type: "health", paid: next })}
+                title="Health insurance"
+                subtitle={
+                  (healthInsurance.coverAmount > 0
+                    ? `Cover ${formatCompactINR(healthInsurance.coverAmount)} · renews ${healthInsurance.renewalDate || "—"}`
+                    : "No cover details set — update in Settings") + (healthPayable ? "" : " · not due this year")
+                }
+                amount={healthInsurance.premium > 0 ? formatINR(healthInsurance.premium) : null}
+                icon={<HeartPulse className="size-4 text-rose-300" />}
+              />
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }
@@ -227,6 +248,7 @@ function BillRow({
   subtitle,
   amount,
   icon,
+  disabled = false,
 }: {
   paid: boolean
   onToggle: (next: boolean) => void
@@ -234,16 +256,18 @@ function BillRow({
   subtitle: string
   amount: string | null
   icon?: React.ReactNode
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={() => onToggle(!paid)}
       className={`group flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${
         paid
           ? "border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10"
           : "border-border/60 bg-muted/15 hover:border-indigo-400/40 hover:bg-muted/25"
-      }`}
+      } ${disabled ? "cursor-default opacity-80 hover:bg-emerald-500/5" : ""}`}
     >
       <span
         className={`flex size-7 shrink-0 items-center justify-center rounded-full transition ${

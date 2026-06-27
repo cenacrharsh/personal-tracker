@@ -460,34 +460,40 @@ export function OverviewPage() {
         </Card>
       </div>
 
-      {/* Insurance */}
-      <div>
-        <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Coverage
+      {/* Insurance (only shown for enabled policies) */}
+      {store.lifeInsurance.enabled || store.healthInsurance.enabled ? (
+        <div>
+          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Coverage
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {store.lifeInsurance.enabled ? (
+              <InsuranceCard
+                title="Life Insurance"
+                icon={<ShieldCheck className="size-4 text-indigo-300" />}
+                cover={store.lifeInsurance.coverAmount}
+                premium={store.lifeInsurance.premium}
+                multiple={lifeMultiple}
+                renewDays={lifeRenewDays}
+                renewDate={store.lifeInsurance.renewalDate}
+                tone="indigo"
+              />
+            ) : null}
+            {store.healthInsurance.enabled ? (
+              <InsuranceCard
+                title="Health Insurance"
+                icon={<HeartPulse className="size-4 text-rose-300" />}
+                cover={store.healthInsurance.coverAmount}
+                premium={store.healthInsurance.premium}
+                multiple={healthMultiple}
+                renewDays={healthRenewDays}
+                renewDate={store.healthInsurance.renewalDate}
+                tone="rose"
+              />
+            ) : null}
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <InsuranceCard
-            title="Life Insurance"
-            icon={<ShieldCheck className="size-4 text-indigo-300" />}
-            cover={store.lifeInsurance.coverAmount}
-            premium={store.lifeInsurance.premium}
-            multiple={lifeMultiple}
-            renewDays={lifeRenewDays}
-            renewDate={store.lifeInsurance.renewalDate}
-            tone="indigo"
-          />
-          <InsuranceCard
-            title="Health Insurance"
-            icon={<HeartPulse className="size-4 text-rose-300" />}
-            cover={store.healthInsurance.coverAmount}
-            premium={store.healthInsurance.premium}
-            multiple={healthMultiple}
-            renewDays={healthRenewDays}
-            renewDate={store.healthInsurance.renewalDate}
-            tone="rose"
-          />
-        </div>
-      </div>
+      ) : null}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 export type InsuranceDetails = {
+  enabled: boolean
   coverAmount: number
   premium: number
   renewalDate: string
