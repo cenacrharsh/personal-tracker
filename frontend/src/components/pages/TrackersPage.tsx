@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ChevronLeft, ChevronRight, Dumbbell, Feather, Flame, CalendarDays, Trophy } from "lucide-react"
+import { Activity, ChevronLeft, ChevronRight, Dumbbell, Feather, Flame, CalendarDays, Trophy } from "lucide-react"
 import { useTrackersStore } from "@/store/useTrackersStore"
 import { YearPicker } from "@/components/primitives/YearPicker"
 import type { ActivityKey } from "@/data"
@@ -35,8 +35,8 @@ const ACTIVITIES: Record<ActivityKey, ActivityDef> = {
     ring: "ring-green-500", border: "border-green-500/40", iconBg: "bg-green-500/20",
   },
   badminton: {
-    key: "badminton", label: "Badminton", icon: Feather,
-    subtitle: "No set goal · just rallies",
+    key: "badminton", label: "Badminton", icon: Feather, goal: 1,
+    subtitle: "Goal · 1× per week",
     text: "text-sky-400", dot: "bg-sky-500", dotShadow: "shadow-sky-500/30",
     ring: "ring-sky-500", border: "border-sky-500/40", iconBg: "bg-sky-500/20",
   },
@@ -102,14 +102,14 @@ function countInWeek(entries: string[], weekStart: Date): number {
 // Consecutive weeks (counting back from now) that hit the weekly goal.
 // The current week is in progress, so it only adds to the streak once the
 // goal is met — never breaks it while still incomplete.
-function computeWeeklyStreak(entries: string[]): number {
+function computeWeeklyStreak(entries: string[], goal: number): number {
   if (entries.length === 0) return 0
   let cursor = getWeekStart(new Date())
-  if (countInWeek(entries, cursor) < WEEK_GOAL) {
+  if (countInWeek(entries, cursor) < goal) {
     cursor = addDays(cursor, -7)
   }
   let streak = 0
-  while (countInWeek(entries, cursor) >= WEEK_GOAL) {
+  while (countInWeek(entries, cursor) >= goal) {
     streak++
     cursor = addDays(cursor, -7)
   }
@@ -179,7 +179,15 @@ export function TrackersPage() {
 
   const yearCount = datesInRange(activeActivity, `${year}-01-01`, `${year}-12-31`).length
 
-  const streak = computeWeeklyStreak(activeEntries)
+  // Combined "active days" across ALL activities — a day counts once even if
+  // multiple activities were logged. Iterates ACTIVITY_ORDER, so any activity
+  // added later is automatically included.
+  const activeDaysIn = (start: string, end: string) =>
+    new Set(ACTIVITY_ORDER.flatMap((k) => datesInRange(k, start, end))).size
+  const monthActiveDays = activeDaysIn(monthStart, monthEnd)
+  const yearActiveDays = activeDaysIn(`${year}-01-01`, `${year}-12-31`)
+
+  const streak = activeDef.goal ? computeWeeklyStreak(activeEntries, activeDef.goal) : 0
   const monthGrid = getMonthGrid(year, calMonth)
   const isCurrentWeek = toDateKey(weekStart) === toDateKey(getWeekStart(new Date()))
   const weekMet = activeDef.goal ? weekCount >= activeDef.goal : false
@@ -227,6 +235,38 @@ export function TrackersPage() {
             </button>
           )
         })}
+      </div>
+
+      {/* Combined active days — the page's headline metric, shown regardless of selection */}
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-linear-to-br from-green-500/10 via-card/50 to-sky-500/10 p-5 shadow-lg shadow-black/20 backdrop-blur">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-linear-to-r from-green-400 to-sky-400" />
+        <div className="pointer-events-none absolute -right-12 -top-12 size-44 rounded-full bg-sky-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-12 -left-12 size-44 rounded-full bg-green-500/20 blur-3xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-5">
+          <div className="flex items-center gap-3">
+            <div className="flex size-11 items-center justify-center rounded-xl bg-linear-to-br from-green-500/30 to-sky-500/30 text-white ring-1 ring-white/15">
+              <Activity className="size-5" />
+            </div>
+            <div>
+              <div className="text-base font-bold tracking-tight">Active days</div>
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">All activities combined</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-white/10">
+            <div className="flex flex-col items-center px-5 sm:px-7">
+              <div className="bg-linear-to-br from-green-300 to-sky-300 bg-clip-text text-4xl font-black tabular-nums leading-none text-transparent">
+                {monthActiveDays}
+              </div>
+              <div className="mt-2 text-[11px] uppercase tracking-wide text-muted-foreground">This month</div>
+            </div>
+            <div className="flex flex-col items-center px-5 sm:px-7">
+              <div className="bg-linear-to-br from-green-300 to-sky-300 bg-clip-text text-4xl font-black tabular-nums leading-none text-transparent">
+                {yearActiveDays}
+              </div>
+              <div className="mt-2 text-[11px] uppercase tracking-wide text-muted-foreground">{year}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Stats strip (reflects the selected activity) */}
