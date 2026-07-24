@@ -2,6 +2,7 @@ import { Router } from "express"
 
 import { TrackerEntry } from "../models/TrackerEntry.js"
 import { TrackerDef } from "../models/TrackerDef.js"
+import { trackersSchema, validate } from "../validation.js"
 
 const router = Router()
 
@@ -27,11 +28,13 @@ router.get("/", async (req, res) => {
 })
 
 // PUT replaces entries per tracker key with the posted arrays.
-router.put("/", async (req, res) => {
-  const body = req.body ?? {}
+// Upsert-then-prune so there is never a window where the old entries are
+// gone and the new ones aren't written yet.
+router.put("/", validate(trackersSchema), async (req, res) => {
+  const body = req.body
 
   for (const [key, tracker] of Object.entries(body)) {
-    const dates = Array.isArray(tracker?.entries) ? tracker.entries : []
+    const dates = tracker.entries ?? []
     const def = ACTIVITY_DEFS[key] ?? { title: key, type: "daily-boolean", config: {} }
 
     // Ensure a definition exists (holds characteristics like weekly goal).
@@ -41,12 +44,18 @@ router.put("/", async (req, res) => {
       { upsert: true, setDefaultsOnInsert: true },
     )
 
-    await TrackerEntry.deleteMany({ userId: req.userId, trackerKey: key })
     if (dates.length) {
-      await TrackerEntry.insertMany(
-        dates.map((date) => ({ userId: req.userId, trackerKey: key, date, value: true })),
+      await TrackerEntry.bulkWrite(
+        dates.map((date) => ({
+          updateOne: {
+            filter: { userId: req.userId, trackerKey: key, date },
+            update: { $set: { value: true } },
+            upsert: true,
+          },
+        })),
       )
     }
+    await TrackerEntry.deleteMany({ userId: req.userId, trackerKey: key, date: { $nin: dates } })
   }
 
   res.json({ ok: true })

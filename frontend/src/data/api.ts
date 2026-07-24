@@ -18,6 +18,10 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   })
 
   if (!res.ok) {
+    // Session expired/invalid: bounce to login instead of silently losing edits.
+    if (res.status === 401 && !path.startsWith("/auth")) {
+      window.dispatchEvent(new Event("api:unauthorized"))
+    }
     let message = res.statusText
     try {
       const body = await res.json()

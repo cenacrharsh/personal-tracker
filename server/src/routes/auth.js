@@ -3,19 +3,14 @@ import bcrypt from "bcryptjs"
 
 import { User } from "../models/User.js"
 import { clearAuthCookie, requireAuth, setAuthCookie, signToken } from "../middleware/auth.js"
+import { loginSchema, signupSchema, validate } from "../validation.js"
 
 const router = Router()
 
 const publicUser = (u) => ({ id: u._id, email: u.email, name: u.name })
 
-router.post("/signup", async (req, res) => {
-  const { email, password, name } = req.body ?? {}
-  if (!email || !password || !name) {
-    return res.status(400).json({ error: "email, password and name are required" })
-  }
-  if (String(password).length < 6) {
-    return res.status(400).json({ error: "Password must be at least 6 characters" })
-  }
+router.post("/signup", validate(signupSchema), async (req, res) => {
+  const { email, password, name } = req.body
   const existing = await User.findOne({ email: String(email).toLowerCase() })
   if (existing) return res.status(409).json({ error: "Email already registered" })
 
@@ -26,9 +21,8 @@ router.post("/signup", async (req, res) => {
   res.status(201).json({ user: publicUser(user) })
 })
 
-router.post("/login", async (req, res) => {
-  const { email, password } = req.body ?? {}
-  if (!email || !password) return res.status(400).json({ error: "email and password are required" })
+router.post("/login", validate(loginSchema), async (req, res) => {
+  const { email, password } = req.body
 
   const user = await User.findOne({ email: String(email).toLowerCase() })
   if (!user) return res.status(401).json({ error: "Invalid credentials" })

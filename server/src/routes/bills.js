@@ -1,6 +1,7 @@
 import { Router } from "express"
 
 import { BillPayment } from "../models/BillPayment.js"
+import { billsSchema, validate } from "../validation.js"
 
 const router = Router()
 
@@ -16,19 +17,37 @@ router.get("/", async (req, res) => {
 })
 
 // PUT replaces the user's bill payments with the posted blob.
-router.put("/", async (req, res) => {
-  const { creditCards = {}, insurance = {} } = req.body ?? {}
+// Upsert-then-prune so there is never a window where the old data is gone
+// and the new data isn't written yet.
+router.put("/", validate(billsSchema), async (req, res) => {
+  const { creditCards, insurance } = req.body
 
-  const docs = []
+  const cardKeys = Object.keys(creditCards)
+  const insuranceKeys = Object.keys(insurance)
+
+  const ops = []
   for (const [key, status] of Object.entries(creditCards)) {
-    docs.push({ userId: req.userId, kind: "card", key, paid: !!status?.paid, paidAt: status?.paidAt })
+    ops.push({
+      updateOne: {
+        filter: { userId: req.userId, kind: "card", key },
+        update: { $set: { paid: !!status?.paid, paidAt: status?.paidAt } },
+        upsert: true,
+      },
+    })
   }
   for (const [key, status] of Object.entries(insurance)) {
-    docs.push({ userId: req.userId, kind: "insurance", key, paid: !!status?.paid, paidAt: status?.paidAt })
+    ops.push({
+      updateOne: {
+        filter: { userId: req.userId, kind: "insurance", key },
+        update: { $set: { paid: !!status?.paid, paidAt: status?.paidAt } },
+        upsert: true,
+      },
+    })
   }
+  if (ops.length) await BillPayment.bulkWrite(ops)
 
-  await BillPayment.deleteMany({ userId: req.userId })
-  if (docs.length) await BillPayment.insertMany(docs)
+  await BillPayment.deleteMany({ userId: req.userId, kind: "card", key: { $nin: cardKeys } })
+  await BillPayment.deleteMany({ userId: req.userId, kind: "insurance", key: { $nin: insuranceKeys } })
 
   res.json({ ok: true })
 })

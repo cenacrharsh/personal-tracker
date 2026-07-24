@@ -1,14 +1,10 @@
 import { ApiAdapter } from "./apiAdapter"
-import { LocalStorageAdapter } from "./localStorageAdapter"
 import type { PortfolioRepository } from "./repository"
 
-// Primary backend: Express + MongoDB.
+// Single source of truth: Express + MongoDB.
 export const repository: PortfolioRepository = new ApiAdapter()
 
-// Kept available for one-time migration of data already saved in this browser.
-export const localRepository: PortfolioRepository = new LocalStorageAdapter()
-
-export { DEFAULT_PORTFOLIO, DEFAULT_CARDS, DEFAULT_BILLS } from "./localStorageAdapter"
+export { DEFAULT_PORTFOLIO, DEFAULT_BILLS } from "./defaults"
 export type {
   PortfolioData,
   CreditCardsData,
@@ -22,5 +18,9 @@ export type {
   ActivityKey,
   ActivityTracker,
   TrackersData,
+  VitalsReport,
+  MetricRange,
+  VitalMetricDef,
+  VitalPanel,
 } from "./types"
 export type { PortfolioRepository } from "./repository"

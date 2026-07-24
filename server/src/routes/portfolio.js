@@ -1,6 +1,7 @@
 import { Router } from "express"
 
 import { Portfolio } from "../models/Portfolio.js"
+import { portfolioSchema, validate } from "../validation.js"
 
 const router = Router()
 
@@ -25,7 +26,7 @@ router.get("/", async (req, res) => {
 })
 
 // PUT the whole portfolio blob.
-router.put("/", async (req, res) => {
+router.put("/", validate(portfolioSchema), async (req, res) => {
   const update = {}
   for (const f of FIELDS) if (f in req.body) update[f] = req.body[f]
   const doc = await Portfolio.findOneAndUpdate(

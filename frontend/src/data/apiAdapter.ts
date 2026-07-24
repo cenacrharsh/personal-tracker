@@ -1,5 +1,12 @@
 import { api } from "./api"
-import type { BillsData, CreditCardsData, PortfolioData, Snapshot, TrackersData } from "./types"
+import type {
+  BillsData,
+  CreditCardsData,
+  PortfolioData,
+  Snapshot,
+  TrackersData,
+  VitalsReport,
+} from "./types"
 import type { PortfolioRepository } from "./repository"
 
 // Talks to the Express/MongoDB backend. Same contract as the localStorage adapter,
@@ -43,6 +50,21 @@ export class ApiAdapter implements PortfolioRepository {
 
   async saveTrackers(data: TrackersData): Promise<void> {
     await api("/trackers", { method: "PUT", body: JSON.stringify(data) })
+  }
+
+  async listVitals(): Promise<VitalsReport[]> {
+    return api<VitalsReport[]>("/vitals")
+  }
+
+  async upsertVitalsReport(report: VitalsReport): Promise<void> {
+    await api(`/vitals/${report.date}`, {
+      method: "PUT",
+      body: JSON.stringify({ lab: report.lab, notes: report.notes, results: report.results }),
+    })
+  }
+
+  async deleteVitalsReport(date: string): Promise<void> {
+    await api(`/vitals/${date}`, { method: "DELETE" })
   }
 
   async reset(): Promise<void> {

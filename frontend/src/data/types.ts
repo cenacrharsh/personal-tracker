@@ -85,3 +85,34 @@ export type TrackersData = {
   gym: ActivityTracker
   badminton: ActivityTracker
 }
+
+export type VitalsReport = {
+  date: string // "YYYY-MM-DD"
+  lab: string
+  notes: string
+  results: Record<string, number> // metricKey -> value; absent key = not tested
+}
+
+export type MetricRange = { low?: number; high?: number } // at least one set
+
+export type VitalPanel =
+  | "sugar"
+  | "lipid"
+  | "cbc"
+  | "vitamins"
+  | "iron"
+  | "kidney"
+  | "electrolytes"
+  | "liver"
+  | "thyroid"
+
+export type VitalMetricDef = {
+  key: string // stable id, e.g. "fasting-glucose"
+  label: string // "Blood Glucose (Fasting)"
+  shortLabel?: string // for matrix column headers, e.g. "Glucose"
+  unit: string // "mg/dL"
+  range: MetricRange
+  panel: VitalPanel
+  core?: boolean // the 11 Notion metrics — always visible in the matrix
+  decimals?: number // display precision, default 1
+}

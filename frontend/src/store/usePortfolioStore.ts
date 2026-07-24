@@ -2,7 +2,6 @@ import { create } from "zustand"
 
 import {
   DEFAULT_BILLS,
-  DEFAULT_CARDS,
   DEFAULT_PORTFOLIO,
   repository,
   type BillsData,
@@ -14,6 +13,9 @@ import {
   type Snapshot,
 } from "@/data"
 import { computeTotals, type PortfolioInputs } from "@/lib/portfolioMath"
+import { clampNonNeg } from "@/lib/money"
+import { todayKey } from "@/lib/dates"
+import { trackSave } from "@/store/useSyncStore"
 
 export type {
   CreditCardConfig,
@@ -22,187 +24,12 @@ export type {
   InsuranceDetails,
 } from "@/data"
 
-const SEEDED_CREDIT_CARD_DATA_2025: CreditCardYearData = {
-  "sbi-cashback": seedYear({
-    cashback: { 1: 0, 2: 171, 3: 603, 4: 1347, 5: 585, 6: 1299, 7: 487, 8: 2559, 9: 433, 10: 5000, 11: 607, 12: 507 },
-    expenses: { 1: 0, 2: 4637, 3: 15829, 4: 39176, 5: 18465, 6: 28095, 7: 11737, 8: 59227, 9: 7007, 10: 100147, 11: 37657.56, 12: 9581.94 },
-  }),
-  "airtel-axis": seedYear({
-    cashback: { 1: 0, 2: 662, 3: 424, 4: 340, 5: 314, 6: 663, 7: 505, 8: 325, 9: 639, 10: 631, 11: 669, 12: 680 },
-    expenses: { 1: 0, 2: 6625.31, 3: 2108, 4: 3203, 5: 7900.07, 6: 4166.76, 7: 2331.31, 8: 8781.08, 9: 5725.11, 10: 6891.54, 11: 7371.3, 12: 1154.24 },
-  }),
-  "phonepe-sbi": seedYear({
-    cashback: { 12: 2500 },
-    expenses: { 11: 3268.61, 12: 41740.93 },
-  }),
-  "kotak-platinum": seedYear({
-    cashback: { 9: 43, 10: 486, 11: 500, 12: 500 },
-    expenses: {},
-  }),
-  "tata-neu-plus": seedYear({
-    cashback: { 2: 105, 3: 133, 4: 15, 5: 322, 6: 10, 7: 11, 8: 9, 10: 46, 11: 51 },
-    expenses: { 3: 24907, 4: 17955, 5: 12794, 6: 29119, 7: 9386, 8: 5286, 9: 4611, 10: 9655, 11: 19241 },
-  }),
-  "amazon-icici": seedYear({
-    cashback: { 3: 297, 4: 1, 5: 576, 9: 446, 11: 993, 12: 496 },
-    expenses: { 3: 5946, 4: 50, 5: 11549, 10: 27619.88, 11: 19871, 12: 9926 },
-  }),
-  "hdfc-millenia": seedYear({
-    cashback: { 10: 171 },
-    expenses: { 3: 4632, 4: 50, 10: 3384 },
-  }),
-  "indusind-tiger": seedYear({
-    cashback: {},
-    expenses: { 10: 2 },
-  }),
-}
-
-const SEEDED_CREDIT_CARD_DATA_2026: CreditCardYearData = {
-  "kotak-platinum": seedYear({
-    cashback: { 1: 500, 2: 500, 3: 500, 4: 192, 5: 200 },
-    expenses: {},
-  }),
-  "sbi-cashback": seedYear({
-    cashback: { 1: 441, 2: 145, 3: 51, 4: 557 },
-    expenses: { 1: 8370, 2: 3661, 4: 10921 },
-  }),
-  "phonepe-sbi": seedYear({
-    cashback: { 1: 3500, 2: 3000, 4: 3000 },
-    expenses: { 1: 29507, 2: 147069, 3: 10777, 4: 140738 },
-  }),
-  "airtel-axis": seedYear({
-    cashback: { 1: 183, 2: 557, 3: 397, 4: 662, 5: 317 },
-    expenses: { 1: 5993.64, 2: 3440.18, 3: 4781.52, 4: 2517.65 },
-  }),
-  "amazon-icici": seedYear({
-    cashback: { 1: 394, 2: 1092, 4: 4 },
-    expenses: { 1: 7895, 2: 21847, 4: 215 },
-  }),
-  "hdfc-millenia": seedYear({ cashback: {}, expenses: {} }),
-  "indusind-tiger": seedYear({
-    cashback: {},
-    expenses: { 2: 1004, 4: 353 },
-  }),
-}
-
-const SEEDED_CREDIT_CARDS_BY_YEAR: Record<number, CreditCardYearData> = {
-  2025: SEEDED_CREDIT_CARD_DATA_2025,
-  2026: SEEDED_CREDIT_CARD_DATA_2026,
-}
-
 function emptyMonthMap(): Record<number, number> {
   const m: Record<number, number> = {}
   for (let i = 1; i <= 12; i += 1) m[i] = 0
   return m
 }
 
-function seedYear(seed: {
-  cashback?: Partial<Record<number, number>>
-  expenses?: Partial<Record<number, number>>
-}) {
-  const cashback = emptyMonthMap()
-  const expenses = emptyMonthMap()
-  for (const [k, v] of Object.entries(seed.cashback ?? {})) cashback[Number(k)] = Number(v ?? 0)
-  for (const [k, v] of Object.entries(seed.expenses ?? {})) expenses[Number(k)] = Number(v ?? 0)
-  return { cashback, expenses }
-}
-
-// One-time rename of stock cards from earlier defaults to current naming.
-// Only applies when the card still carries the previous default name verbatim,
-// so user-customized names are never overwritten.
-const STOCK_CARD_RENAMES: Record<string, { from: string; to: string }> = {
-  "phonepe-sbi": { from: "PhonePe SBI", to: "SBI PhonePe" },
-  // Undo an earlier accidental rename of the stock Airtel Axis card.
-  "airtel-axis": { from: "HSBC Live+", to: "Airtel Axis" },
-}
-
-function renameDefaultCards(cards: CreditCardConfig[]): CreditCardConfig[] {
-  return cards.map((card) => {
-    const rule = STOCK_CARD_RENAMES[card.id]
-    if (!rule) return card
-    if (card.name !== rule.from) return card
-    return { ...card, name: rule.to }
-  })
-}
-
-// If a stock card was deleted but historical data for it still exists,
-// re-add the card config so the data is reachable in the UI again.
-function restoreStockCardIfDataExists(
-  cards: CreditCardConfig[],
-  dataByYear: Record<number, CreditCardYearData>,
-  cardId: string,
-): CreditCardConfig[] {
-  if (cards.some((c) => c.id === cardId)) return cards
-
-  let hasData = false
-  for (const yearData of Object.values(dataByYear)) {
-    const entry = yearData[cardId]
-    if (!entry) continue
-    const values = [
-      ...Object.values(entry.cashback ?? {}),
-      ...Object.values(entry.expenses ?? {}),
-    ]
-    if (values.some((v) => Number(v) > 0)) {
-      hasData = true
-      break
-    }
-  }
-  if (!hasData) return cards
-
-  const stock = DEFAULT_CARDS.creditCards.find((c) => c.id === cardId)
-  if (!stock) return cards
-  return [...cards, stock]
-}
-
-// User-saved values win where set (non-zero). Seed fills empty/zero cells.
-function mergeCardsByYear(
-  seed: Record<number, CreditCardYearData>,
-  user: Record<number, CreditCardYearData>,
-): Record<number, CreditCardYearData> {
-  const out: Record<number, CreditCardYearData> = {}
-  const years = new Set<number>()
-  for (const y of Object.keys(seed)) years.add(Number(y))
-  for (const y of Object.keys(user)) years.add(Number(y))
-
-  for (const year of years) {
-    const seedYearData = seed[year] ?? {}
-    const userYearData = user[year] ?? {}
-    const cardIds = new Set<string>([
-      ...Object.keys(seedYearData),
-      ...Object.keys(userYearData),
-    ])
-    const mergedYear: CreditCardYearData = {}
-
-    for (const cardId of cardIds) {
-      const seedCard = seedYearData[cardId]
-      const userCard = userYearData[cardId]
-      if (!seedCard) {
-        mergedYear[cardId] = userCard!
-        continue
-      }
-      if (!userCard) {
-        mergedYear[cardId] = seedCard
-        continue
-      }
-      const cashback: Record<number, number> = {}
-      const expenses: Record<number, number> = {}
-      for (let m = 1; m <= 12; m += 1) {
-        const uc = userCard.cashback?.[m] ?? 0
-        const sc = seedCard.cashback?.[m] ?? 0
-        cashback[m] = uc !== 0 ? uc : sc
-        const ue = userCard.expenses?.[m] ?? 0
-        const se = seedCard.expenses?.[m] ?? 0
-        expenses[m] = ue !== 0 ? ue : se
-      }
-      mergedYear[cardId] = { cashback, expenses }
-    }
-
-    out[year] = mergedYear
-  }
-  return out
-}
-
-const clampNonNeg = (n: number) => (Number.isFinite(n) && n > 0 ? n : Math.max(0, Number.isFinite(n) ? n : 0))
 const clampMonth = (n: number) => {
   const v = Math.round(Number.isFinite(n) ? n : 1)
   return Math.min(12, Math.max(1, v))
@@ -260,7 +87,7 @@ export const insuranceBillKey = (year: number, type: "life" | "health") => `${ye
 
 export const usePortfolioStore = create<PortfolioState>()((set) => ({
   ...DEFAULT_PORTFOLIO,
-  creditCards: DEFAULT_CARDS.creditCards,
+  creditCards: [],
   creditCardDataByYear: {},
   loaded: false,
   snapshots: [],
@@ -274,18 +101,6 @@ export const usePortfolioStore = create<PortfolioState>()((set) => ({
       repository.getBills(),
     ])
 
-    const mergedCardsByYear = mergeCardsByYear(
-      SEEDED_CREDIT_CARDS_BY_YEAR,
-      cards?.creditCardDataByYear ?? {},
-    )
-
-    const renamedCards = renameDefaultCards(cards?.creditCards ?? DEFAULT_CARDS.creditCards)
-    const migratedCards = restoreStockCardIfDataExists(
-      renamedCards,
-      mergedCardsByYear,
-      "tata-neu-plus",
-    )
-
     const loadedPortfolio = portfolio ?? DEFAULT_PORTFOLIO
 
     set({
@@ -294,8 +109,8 @@ export const usePortfolioStore = create<PortfolioState>()((set) => ({
       // insurance stays visible until the user explicitly turns it off.
       lifeInsurance: { ...loadedPortfolio.lifeInsurance, enabled: loadedPortfolio.lifeInsurance.enabled ?? true },
       healthInsurance: { ...loadedPortfolio.healthInsurance, enabled: loadedPortfolio.healthInsurance.enabled ?? true },
-      creditCards: migratedCards,
-      creditCardDataByYear: mergedCardsByYear,
+      creditCards: cards?.creditCards ?? [],
+      creditCardDataByYear: cards?.creditCardDataByYear ?? {},
       snapshots,
       bills: bills ?? DEFAULT_BILLS,
       loaded: true,
@@ -469,8 +284,8 @@ export const usePortfolioStore = create<PortfolioState>()((set) => ({
     await repository.reset()
     set({
       ...DEFAULT_PORTFOLIO,
-      creditCards: DEFAULT_CARDS.creditCards,
-      creditCardDataByYear: { ...SEEDED_CREDIT_CARDS_BY_YEAR },
+      creditCards: [],
+      creditCardDataByYear: {},
       snapshots: [],
       bills: DEFAULT_BILLS,
     })
@@ -504,14 +319,6 @@ function pickCards(s: PortfolioState): CreditCardsData {
   }
 }
 
-function todayKey() {
-  const d = new Date()
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${y}-${m}-${day}`
-}
-
 function snapshotFromState(s: PortfolioState): Snapshot {
   const inputs: PortfolioInputs = pickPortfolio(s)
   const totals = computeTotals(inputs)
@@ -537,7 +344,12 @@ function schedulePortfolioSave(getState: () => PortfolioState) {
   portfolioSaveTimer = setTimeout(() => {
     const s = getState()
     if (!s.loaded) return
-    void repository.savePortfolio(pickPortfolio(s))
+    trackSave(
+      () => repository.savePortfolio(pickPortfolio(s)),
+      () => {
+        portfolioFingerprint = ""
+      },
+    )
   }, 400)
 }
 
@@ -546,7 +358,12 @@ function scheduleCardsSave(getState: () => PortfolioState) {
   cardsSaveTimer = setTimeout(() => {
     const s = getState()
     if (!s.loaded) return
-    void repository.saveCreditCards(pickCards(s))
+    trackSave(
+      () => repository.saveCreditCards(pickCards(s)),
+      () => {
+        cardsFingerprint = ""
+      },
+    )
   }, 400)
 }
 
@@ -555,20 +372,32 @@ function scheduleBillsSave(getState: () => PortfolioState) {
   billsSaveTimer = setTimeout(() => {
     const s = getState()
     if (!s.loaded) return
-    void repository.saveBills(s.bills)
+    trackSave(
+      () => repository.saveBills(s.bills),
+      () => {
+        billsFingerprint = ""
+      },
+    )
   }, 200)
 }
 
 function scheduleSnapshot(getState: () => PortfolioState) {
   if (snapshotTimer) clearTimeout(snapshotTimer)
-  snapshotTimer = setTimeout(async () => {
+  snapshotTimer = setTimeout(() => {
     const s = getState()
     if (!s.loaded) return
     const snap = snapshotFromState(s)
     if (snap.netWorth <= 0 && snap.emergencyFund <= 0) return
-    await repository.upsertSnapshot(snap)
-    const next = await repository.listSnapshots()
-    usePortfolioStore.setState({ snapshots: next })
+    trackSave(
+      async () => {
+        await repository.upsertSnapshot(snap)
+        const next = await repository.listSnapshots()
+        usePortfolioStore.setState({ snapshots: next })
+      },
+      () => {
+        snapshotFingerprint = ""
+      },
+    )
   }, 1500)
 }
 

@@ -2,6 +2,7 @@ import { Router } from "express"
 
 import { CreditCard } from "../models/CreditCard.js"
 import { CardMonthly } from "../models/CardMonthly.js"
+import { cardsSchema, validate } from "../validation.js"
 
 const router = Router()
 
@@ -46,28 +47,35 @@ router.get("/", async (req, res) => {
 })
 
 // PUT replaces the user's cards + monthly data with the posted blob.
-// Whole-blob replace keeps mapping trivial; data volume is tiny.
-router.put("/", async (req, res) => {
-  const { creditCards = [], creditCardDataByYear = {} } = req.body ?? {}
+// Upsert-then-prune (bulkWrite + deleteMany $nin) so there is never a window
+// where the old data is gone and the new data isn't written yet.
+router.put("/", validate(cardsSchema), async (req, res) => {
+  const { creditCards, creditCardDataByYear } = req.body
 
-  const configDocs = creditCards.map((c) => ({
-    userId: req.userId,
-    cardId: c.id,
-    name: c.name,
-    anniversaryStartMonth: c.anniversaryStartMonth,
-    feeWaiverTarget: c.feeWaiverTarget,
-    status: c.status,
-    annualFeeType: c.annualFeeType,
-    annualFeeAmount: c.annualFeeAmount,
-    creditLimit: c.creditLimit,
-    benefitsNote: c.benefitsNote,
+  const postedCardIds = creditCards.map((c) => c.id)
+  const configOps = creditCards.map((c) => ({
+    updateOne: {
+      filter: { userId: req.userId, cardId: c.id },
+      update: {
+        $set: {
+          name: c.name,
+          anniversaryStartMonth: c.anniversaryStartMonth,
+          feeWaiverTarget: c.feeWaiverTarget,
+          status: c.status,
+          annualFeeType: c.annualFeeType,
+          annualFeeAmount: c.annualFeeAmount,
+          creditLimit: c.creditLimit,
+          benefitsNote: c.benefitsNote,
+        },
+      },
+      upsert: true,
+    },
   }))
 
   const monthlyDocs = []
   for (const [year, byCard] of Object.entries(creditCardDataByYear)) {
     for (const [cardId, entry] of Object.entries(byCard ?? {})) {
       monthlyDocs.push({
-        userId: req.userId,
         cardId,
         year: Number(year),
         cashback: entry?.cashback ?? {},
@@ -75,15 +83,23 @@ router.put("/", async (req, res) => {
       })
     }
   }
+  const monthlyOps = monthlyDocs.map((d) => ({
+    updateOne: {
+      filter: { userId: req.userId, cardId: d.cardId, year: d.year },
+      update: { $set: { cashback: d.cashback, expenses: d.expenses } },
+      upsert: true,
+    },
+  }))
 
-  await Promise.all([
-    CreditCard.deleteMany({ userId: req.userId }),
-    CardMonthly.deleteMany({ userId: req.userId }),
-  ])
-  await Promise.all([
-    configDocs.length ? CreditCard.insertMany(configDocs) : null,
-    monthlyDocs.length ? CardMonthly.insertMany(monthlyDocs) : null,
-  ])
+  if (configOps.length) await CreditCard.bulkWrite(configOps)
+  if (monthlyOps.length) await CardMonthly.bulkWrite(monthlyOps)
+
+  await CreditCard.deleteMany({ userId: req.userId, cardId: { $nin: postedCardIds } })
+  const monthlyPairs = monthlyDocs.map(({ cardId, year }) => ({ cardId, year }))
+  await CardMonthly.deleteMany({
+    userId: req.userId,
+    ...(monthlyPairs.length ? { $nor: monthlyPairs } : {}),
+  })
 
   res.json({ ok: true })
 })

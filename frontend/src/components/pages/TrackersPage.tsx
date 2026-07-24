@@ -2,14 +2,11 @@ import { useEffect, useState } from "react"
 import { Activity, ChevronLeft, ChevronRight, Dumbbell, Feather, Flame, CalendarDays, Trophy } from "lucide-react"
 import { useTrackersStore } from "@/store/useTrackersStore"
 import { YearPicker } from "@/components/primitives/YearPicker"
+import { MONTH_NAMES, toDateKey, todayKey } from "@/lib/dates"
 import type { ActivityKey } from "@/data"
 
 const WEEK_GOAL = 3
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-]
 
 type ActivityDef = {
   key: ActivityKey
@@ -42,17 +39,6 @@ const ACTIVITIES: Record<ActivityKey, ActivityDef> = {
   },
 }
 const ACTIVITY_ORDER: ActivityKey[] = ["gym", "badminton"]
-
-function toDateKey(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${y}-${m}-${day}`
-}
-
-function todayKey(): string {
-  return toDateKey(new Date())
-}
 
 function getWeekStart(d: Date): Date {
   const copy = new Date(d)
@@ -226,6 +212,7 @@ export function TrackersPage() {
             <button
               key={key}
               onClick={() => setActiveActivity(key)}
+              aria-pressed={active}
               className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                 active ? `${def.iconBg} ${def.text}` : "text-muted-foreground hover:text-foreground"
               }`}

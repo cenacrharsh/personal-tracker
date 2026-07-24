@@ -53,3 +53,8 @@ export const useAuthStore = create<AuthState>()((set) => ({
     }
   },
 }))
+
+// Fired by the api client on a 401 from any non-auth route.
+window.addEventListener("api:unauthorized", () => {
+  useAuthStore.setState({ user: null, status: "anon" })
+})

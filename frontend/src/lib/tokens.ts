@@ -14,6 +14,16 @@ export const ASSET_LABELS: Record<AllocationCategory, string> = {
   debt: "Debt",
 }
 
-export const GAIN_COLOR = "#10b981"
-export const LOSS_COLOR = "#f43f5e"
-export const CASH_COLOR = "#06b6d4"
+// Shared categorical palette for multi-series charts.
+export const CHART_PALETTE = [
+  "#6366f1",
+  "#f59e0b",
+  "#10b981",
+  "#06b6d4",
+  "#ec4899",
+  "#a855f7",
+  "#f43f5e",
+  "#84cc16",
+  "#0ea5e9",
+  "#fb923c",
+]

@@ -1,4 +1,11 @@
-import type { BillsData, CreditCardsData, PortfolioData, Snapshot, TrackersData } from "./types"
+import type {
+  BillsData,
+  CreditCardsData,
+  PortfolioData,
+  Snapshot,
+  TrackersData,
+  VitalsReport,
+} from "./types"
 
 export interface PortfolioRepository {
   getPortfolio(): Promise<PortfolioData | null>
@@ -15,6 +22,10 @@ export interface PortfolioRepository {
 
   getTrackers(): Promise<TrackersData | null>
   saveTrackers(data: TrackersData): Promise<void>
+
+  listVitals(): Promise<VitalsReport[]>
+  upsertVitalsReport(report: VitalsReport): Promise<void>
+  deleteVitalsReport(date: string): Promise<void>
 
   reset(): Promise<void>
 }

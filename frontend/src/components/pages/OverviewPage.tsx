@@ -25,8 +25,11 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { DeltaPill, KPICard } from "@/components/primitives/KPICard"
+import { DeltaPill, StatTile } from "@/components/primitives/StatTile"
+import { RingProgress } from "@/components/primitives/RingProgress"
 import { Sparkline } from "@/components/primitives/Sparkline"
+import { AXIS_TICK, CHART_GRID_STROKE, CHART_TOOLTIP_STYLE } from "@/components/primitives/chart"
+import { daysUntil } from "@/lib/dates"
 import { formatCompactINR, formatINR, formatPercent } from "@/lib/money"
 import {
   computeCurrentAllocationPercents,
@@ -43,6 +46,8 @@ import type { Snapshot } from "@/data"
 
 type Range = "1M" | "3M" | "1Y" | "ALL"
 
+const ALLOCATION_ORDER: AllocationCategory[] = ["equity", "gold", "silver", "debt"]
+
 function filterSnapshotsByRange(snaps: Snapshot[], range: Range) {
   if (snaps.length === 0) return []
   if (range === "ALL") return snaps
@@ -51,35 +56,46 @@ function filterSnapshotsByRange(snaps: Snapshot[], range: Range) {
   return snaps.filter((s) => s.ts >= cutoff)
 }
 
-function daysUntil(iso: string) {
-  const target = new Date(iso).getTime()
-  if (!Number.isFinite(target)) return Number.POSITIVE_INFINITY
-  return Math.round((target - Date.now()) / (24 * 60 * 60 * 1000))
-}
-
 export function OverviewPage() {
   const store = usePortfolioStore()
   const [range, setRange] = useState<Range>("3M")
 
-  const inputs: PortfolioInputs = {
-    age: store.age,
-    monthlyIncome: store.monthlyIncome,
-    silverEnabled: store.silverEnabled,
-    zerodhaTotal: store.zerodhaTotal,
-    zerodhaGoldEtf: store.zerodhaGoldEtf,
-    zerodhaSilverEtf: store.zerodhaSilverEtf,
-    mfTotal: store.mfTotal,
-    mfGold: store.mfGold,
-    mfSilver: store.mfSilver,
-    fdAmount: store.fdAmount,
-    rdAmount: store.rdAmount,
-    epfPpfAmount: store.epfPpfAmount,
-    currentEmergencyFund: store.currentEmergencyFund,
-  }
+  const inputs: PortfolioInputs = useMemo(
+    () => ({
+      age: store.age,
+      monthlyIncome: store.monthlyIncome,
+      silverEnabled: store.silverEnabled,
+      zerodhaTotal: store.zerodhaTotal,
+      zerodhaGoldEtf: store.zerodhaGoldEtf,
+      zerodhaSilverEtf: store.zerodhaSilverEtf,
+      mfTotal: store.mfTotal,
+      mfGold: store.mfGold,
+      mfSilver: store.mfSilver,
+      fdAmount: store.fdAmount,
+      rdAmount: store.rdAmount,
+      epfPpfAmount: store.epfPpfAmount,
+      currentEmergencyFund: store.currentEmergencyFund,
+    }),
+    [
+      store.age,
+      store.monthlyIncome,
+      store.silverEnabled,
+      store.zerodhaTotal,
+      store.zerodhaGoldEtf,
+      store.zerodhaSilverEtf,
+      store.mfTotal,
+      store.mfGold,
+      store.mfSilver,
+      store.fdAmount,
+      store.rdAmount,
+      store.epfPpfAmount,
+      store.currentEmergencyFund,
+    ],
+  )
 
-  const totals = computeTotals(inputs)
-  const current = computeCurrentAllocationPercents(inputs)
-  const target = computeTargetAllocationPercents(inputs)
+  const totals = useMemo(() => computeTotals(inputs), [inputs])
+  const current = useMemo(() => computeCurrentAllocationPercents(inputs), [inputs])
+  const target = useMemo(() => computeTargetAllocationPercents(inputs), [inputs])
 
   const targetEmergency = computeTargetEmergencyFund(store.monthlyIncome)
   const efDelta = computeEmergencyFundDelta(store.currentEmergencyFund, store.monthlyIncome)
@@ -113,53 +129,59 @@ export function OverviewPage() {
     return ((last - first) / first) * 100
   }, [store.snapshots])
 
-  const allocationOrder: AllocationCategory[] = ["equity", "gold", "silver", "debt"]
-  const allocationData = allocationOrder
-    .filter((k) => k !== "silver" || store.silverEnabled)
-    .map((k) => ({
-      name: ASSET_LABELS[k],
-      key: k,
-      value: current[k],
-      amount:
-        k === "equity"
-          ? totals.totalEquity
-          : k === "gold"
-            ? totals.totalGold
-            : k === "silver"
-              ? totals.totalSilver
-              : totals.totalDebt,
-    }))
+  const allocationData = useMemo(
+    () =>
+      ALLOCATION_ORDER
+        .filter((k) => k !== "silver" || store.silverEnabled)
+        .map((k) => ({
+          name: ASSET_LABELS[k],
+          key: k,
+          value: current[k],
+          amount:
+            k === "equity"
+              ? totals.totalEquity
+              : k === "gold"
+                ? totals.totalGold
+                : k === "silver"
+                  ? totals.totalSilver
+                  : totals.totalDebt,
+        })),
+    [store.silverEnabled, current, totals],
+  )
 
-  const buckets = [
-    {
-      key: "equity" as const,
-      label: "Equity",
-      icon: <LineChartIcon className="size-4" />,
-      amount: totals.totalEquity,
-    },
-    {
-      key: "gold" as const,
-      label: "Gold",
-      icon: <Coins className="size-4" />,
-      amount: totals.totalGold,
-    },
-    ...(store.silverEnabled
-      ? [
-          {
-            key: "silver" as const,
-            label: "Silver",
-            icon: <Coins className="size-4" />,
-            amount: totals.totalSilver,
-          },
-        ]
-      : []),
-    {
-      key: "debt" as const,
-      label: "Debt",
-      icon: <Banknote className="size-4" />,
-      amount: totals.totalDebt,
-    },
-  ]
+  const buckets = useMemo(
+    () => [
+      {
+        key: "equity" as const,
+        label: "Equity",
+        icon: <LineChartIcon className="size-4" />,
+        amount: totals.totalEquity,
+      },
+      {
+        key: "gold" as const,
+        label: "Gold",
+        icon: <Coins className="size-4" />,
+        amount: totals.totalGold,
+      },
+      ...(store.silverEnabled
+        ? [
+            {
+              key: "silver" as const,
+              label: "Silver",
+              icon: <Coins className="size-4" />,
+              amount: totals.totalSilver,
+            },
+          ]
+        : []),
+      {
+        key: "debt" as const,
+        label: "Debt",
+        icon: <Banknote className="size-4" />,
+        amount: totals.totalDebt,
+      },
+    ],
+    [store.silverEnabled, totals],
+  )
 
   const lifeMultiple = store.monthlyIncome > 0 ? store.lifeInsurance.coverAmount / (store.monthlyIncome * 12) : 0
   const healthMultiple = store.monthlyIncome > 0 ? store.healthInsurance.coverAmount / (store.monthlyIncome * 12) : 0
@@ -210,6 +232,7 @@ export function OverviewPage() {
               <button
                 key={r}
                 onClick={() => setRange(r)}
+                aria-pressed={r === range}
                 className={`rounded-full px-3 py-1 text-xs transition ${
                   r === range
                     ? "bg-indigo-500/30 text-foreground"
@@ -232,28 +255,23 @@ export function OverviewPage() {
                     <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <CartesianGrid stroke={CHART_GRID_STROKE} vertical={false} />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 10, fill: "rgba(255,255,255,0.45)" }}
+                  tick={AXIS_TICK}
                   axisLine={false}
                   tickLine={false}
                   minTickGap={32}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: "rgba(255,255,255,0.45)" }}
+                  tick={AXIS_TICK}
                   axisLine={false}
                   tickLine={false}
                   width={56}
                   tickFormatter={(v: number) => formatCompactINR(v)}
                 />
                 <Tooltip
-                  contentStyle={{
-                    background: "rgba(20,20,30,0.92)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 12,
-                    fontSize: 12,
-                  }}
+                  contentStyle={CHART_TOOLTIP_STYLE}
                   labelStyle={{ color: "rgba(255,255,255,0.7)" }}
                   formatter={(v) => [formatINR(Number(v)), "Net worth"]}
                 />
@@ -293,7 +311,7 @@ export function OverviewPage() {
             const share =
               totals.totalPortfolioValue > 0 ? (b.amount / totals.totalPortfolioValue) * 100 : 0
             return (
-              <KPICard
+              <StatTile
                 key={b.key}
                 label={b.label}
                 value={formatCompactINR(b.amount)}
@@ -302,7 +320,7 @@ export function OverviewPage() {
                 sub={`${formatPercent(share)} of net worth`}
               >
                 <Sparkline data={trend} color={ASSET_COLORS[b.key]} height={36} />
-              </KPICard>
+              </StatTile>
             )
           })}
         </div>
@@ -355,7 +373,7 @@ export function OverviewPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                {allocationOrder
+                {ALLOCATION_ORDER
                   .filter((k) => k !== "silver" || store.silverEnabled)
                   .map((k) => {
                     const cur = current[k]
@@ -424,7 +442,12 @@ export function OverviewPage() {
             </div>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col items-center justify-center gap-5">
-            <RingProgress value={efProgress} months={efMonths} />
+            <RingProgress percent={efProgress} size={128} stroke={8} color="#06b6d4">
+              <div className="flex flex-col items-center">
+                <div className="text-xl font-semibold">{efMonths.toFixed(1)}</div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">months</div>
+              </div>
+            </RingProgress>
             <div className="grid w-full grid-cols-2 gap-3 text-center">
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -494,36 +517,6 @@ export function OverviewPage() {
           </div>
         </div>
       ) : null}
-    </div>
-  )
-}
-
-function RingProgress({ value, months }: { value: number; months: number }) {
-  const radius = 44
-  const circumference = 2 * Math.PI * radius
-  const filled = Math.max(0, Math.min(100, value))
-  const dashOffset = circumference * (1 - filled / 100)
-  return (
-    <div className="relative size-[128px] shrink-0">
-      <svg viewBox="0 0 100 100" className="size-full -rotate-90">
-        <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={8} />
-        <circle
-          cx="50"
-          cy="50"
-          r={radius}
-          fill="none"
-          stroke="#06b6d4"
-          strokeWidth={8}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={dashOffset}
-          style={{ transition: "stroke-dashoffset 0.6s ease" }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-xl font-semibold">{months.toFixed(1)}</div>
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">months</div>
-      </div>
     </div>
   )
 }

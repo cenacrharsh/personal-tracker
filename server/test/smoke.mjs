@@ -25,7 +25,7 @@ function assert(cond, msg) {
 
 const mongo = await MongoMemoryServer.create()
 process.env.MONGODB_URI = mongo.getUri()
-process.env.JWT_SECRET = "test-secret"
+process.env.JWT_SECRET = "test-secret-at-least-32-characters-long"
 process.env.PORT = String(PORT)
 process.env.NODE_ENV = "test"
 
@@ -54,6 +54,9 @@ assert(r.status === 401, "unauthenticated portfolio GET is 401")
 r = await call("/auth/signup", { method: "POST", body: { name: "You", email: "you@example.com", password: "secret123" } })
 assert(r.status === 201 && r.json.user.email === "you@example.com", "signup creates user + sets cookie")
 
+r = await call("/auth/signup", { method: "POST", body: { name: "You", email: "you@example.com", password: "secret123" } })
+assert(r.status === 409, "duplicate signup returns 409")
+
 // 3. authed portfolio is null initially, then round-trips
 r = await call("/portfolio")
 assert(r.status === 200 && r.json === null, "portfolio null before first save")
@@ -63,6 +66,11 @@ assert(r.status === 200 && r.json.age === 31 && r.json.fdAmount === 5000, "portf
 
 r = await call("/portfolio")
 assert(r.status === 200 && r.json.monthlyIncome === 200000, "portfolio GET returns saved data")
+
+r = await call("/portfolio", { method: "PUT", body: { fdAmount: -100 } })
+assert(r.status === 400 && typeof r.json.error === "string", "portfolio PUT with negative number is 400")
+r = await call("/portfolio")
+assert(r.json.fdAmount === 5000, "invalid portfolio PUT did not persist")
 
 // 4. cards round-trip (config + monthly assembled back)
 r = await call("/cards", {
@@ -102,6 +110,34 @@ assert(r.status === 200, "snapshot POST ok")
 r = await call("/snapshots")
 assert(Array.isArray(r.json) && r.json.length === 1 && r.json[0].netWorth === 50000, "snapshots GET returns series")
 
+// 7b. vitals: upsert, re-upsert (update not duplicate), sorted GET, invalid body, delete
+r = await call("/vitals/2026-01-01", {
+  method: "PUT",
+  body: { lab: "Thyrocare", notes: "", results: { hemoglobin: 14.5, "vitamin-d": 25 } },
+})
+assert(r.status === 200 && r.json.results.hemoglobin === 14.5, "vitals PUT upserts a report")
+
+r = await call("/vitals/2026-01-01", { method: "PUT", body: { results: { hemoglobin: 15 } } })
+assert(r.status === 200 && r.json.results.hemoglobin === 15, "vitals PUT on same date updates in place")
+r = await call("/vitals")
+assert(r.json.filter((v) => v.date === "2026-01-01").length === 1, "re-upserting the same date does not duplicate")
+
+r = await call("/vitals/2025-06-01", { method: "PUT", body: { results: { hemoglobin: 13.8 } } })
+assert(r.status === 200, "second vitals report PUT ok")
+r = await call("/vitals")
+assert(r.json.length === 2 && r.json[0].date === "2025-06-01" && r.json[1].date === "2026-01-01", "vitals GET is sorted by date ascending")
+
+r = await call("/vitals/2026-02-01", { method: "PUT", body: { results: { "BAD KEY!": 5 } } })
+assert(r.status === 400, "vitals PUT with invalid metric key is 400")
+
+r = await call("/vitals/not-a-date", { method: "PUT", body: { results: { hemoglobin: 10 } } })
+assert(r.status === 400, "vitals PUT with malformed date param is 400")
+
+r = await call("/vitals/2026-01-01", { method: "DELETE" })
+assert(r.status === 200, "vitals DELETE ok")
+r = await call("/vitals/2026-01-01", { method: "DELETE" })
+assert(r.status === 404, "deleting an already-deleted report is 404")
+
 // 8. isolation: a second user sees none of the first user's data
 cookie = ""
 r = await call("/auth/signup", { method: "POST", body: { name: "Her", email: "her@example.com", password: "secret123" } })
@@ -110,6 +146,10 @@ r = await call("/portfolio")
 assert(r.json === null, "second user has isolated (empty) portfolio")
 r = await call("/trackers")
 assert(r.json.gym.entries.length === 0, "second user has isolated (empty) trackers")
+r = await call("/vitals")
+assert(Array.isArray(r.json) && r.json.length === 0, "second user has isolated (empty) vitals")
+r = await call("/vitals/2025-06-01", { method: "DELETE" })
+assert(r.status === 404, "second user cannot delete first user's vitals report")
 
 // 9. reset wipes current user's data
 r = await call("/auth/login", { method: "POST", body: { email: "you@example.com", password: "secret123" } })
@@ -118,6 +158,8 @@ r = await call("/data/reset", { method: "POST" })
 assert(r.status === 200, "reset ok")
 r = await call("/portfolio")
 assert(r.json === null, "portfolio cleared after reset")
+r = await call("/vitals")
+assert(r.json.length === 0, "vitals cleared after reset")
 
 console.log("\nALL SMOKE TESTS PASSED")
 await mongo.stop()

@@ -1,6 +1,7 @@
 import { create } from "zustand"
 
 import { repository, type ActivityKey, type ActivityTracker, type TrackersData } from "@/data"
+import { trackSave } from "@/store/useSyncStore"
 
 const DEFAULT_TRACKERS: TrackersData = {
   gym: { entries: [] },
@@ -60,6 +61,11 @@ useTrackersStore.subscribe((state) => {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     const s = useTrackersStore.getState()
-    void repository.saveTrackers({ gym: s.gym, badminton: s.badminton })
+    trackSave(
+      () => repository.saveTrackers({ gym: s.gym, badminton: s.badminton }),
+      () => {
+        fingerprint = ""
+      },
+    )
   }, 400)
 })

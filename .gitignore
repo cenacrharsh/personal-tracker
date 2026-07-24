@@ -18,6 +18,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# Planning docs — kept locally as a record of what we planned, not pushed
+docs/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

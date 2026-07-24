@@ -9,10 +9,9 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { YearPicker } from "@/components/primitives/YearPicker"
+import { MONTHS } from "@/lib/dates"
 import { formatCompactINR, formatINR } from "@/lib/money"
 import { ccBillKey, insuranceBillKey, usePortfolioStore } from "@/store/usePortfolioStore"
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 export function BillsPage() {
   const {

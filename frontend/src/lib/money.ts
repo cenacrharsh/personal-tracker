@@ -22,15 +22,14 @@ export function formatPercent(n: number, digits = 1) {
   return `${n.toFixed(digits)}%`
 }
 
-export function formatSignedINR(n: number) {
-  const safe = Number.isFinite(n) ? n : 0
-  const sign = safe >= 0 ? "+" : "-"
-  return `${sign}₹${Math.abs(Math.round(safe)).toLocaleString("en-IN")}`
-}
-
 export function clampNumber(value: unknown) {
   const n = typeof value === "number" ? value : Number(value)
   if (!Number.isFinite(n)) return 0
   return n
+}
+
+export function clampNonNeg(value: unknown) {
+  const n = clampNumber(value)
+  return n < 0 ? 0 : n
 }
 
