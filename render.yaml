@@ -18,3 +18,5 @@ services:
         sync: false
       - key: FRONTEND_URL # your Vercel production URL, e.g. https://portfolio-tracker.vercel.app
         sync: false
+      - key: SIGNUP_ENABLED # "true" only while registering an account; off otherwise
+        value: "false"

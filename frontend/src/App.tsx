@@ -1,8 +1,9 @@
-import { useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Redirect, Route, Switch } from "wouter"
 
 import { AppShell } from "@/components/layout/AppShell"
 import { AppSkeleton } from "@/components/layout/AppSkeleton"
+import { Button } from "@/components/ui/button"
 import { Toaster } from "@/components/ui/sonner"
 import { OverviewPage } from "@/components/pages/OverviewPage"
 import { HoldingsPage } from "@/components/pages/HoldingsPage"
@@ -24,16 +25,27 @@ export default function App() {
   const loaded = usePortfolioStore((s) => s.loaded)
   const hydrateVitals = useVitalsStore((s) => s.hydrate)
 
+  // Installed to a home screen there is no address bar, so a failed first load
+  // would otherwise strand the user on the skeleton with no way to retry.
+  const [loadFailed, setLoadFailed] = useState(false)
+
+  const load = useCallback(
+    () => Promise.all([hydrate(), hydrateVitals()]).catch(() => setLoadFailed(true)),
+    [hydrate, hydrateVitals],
+  )
+
+  const retry = () => {
+    setLoadFailed(false)
+    void load()
+  }
+
   useEffect(() => {
     void checkAuth()
   }, [checkAuth])
 
   useEffect(() => {
-    if (status === "authed") {
-      void hydrate()
-      void hydrateVitals()
-    }
-  }, [status, hydrate, hydrateVitals])
+    if (status === "authed") void load()
+  }, [status, load])
 
   return (
     <>
@@ -41,6 +53,18 @@ export default function App() {
         <AppSkeleton />
       ) : status === "anon" ? (
         <AuthPage />
+      ) : loadFailed ? (
+        <div className="flex min-h-screen items-center justify-center px-6 text-center">
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Couldn't reach the server</p>
+            <p className="text-xs text-muted-foreground">
+              It may still be waking up. Give it a moment, then try again.
+            </p>
+            <Button size="sm" onClick={retry}>
+              Try again
+            </Button>
+          </div>
+        </div>
       ) : !loaded ? (
         <AppSkeleton />
       ) : (

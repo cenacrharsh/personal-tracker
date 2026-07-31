@@ -28,6 +28,8 @@ process.env.MONGODB_URI = mongo.getUri()
 process.env.JWT_SECRET = "test-secret-at-least-32-characters-long"
 process.env.PORT = String(PORT)
 process.env.NODE_ENV = "test"
+// Signup is closed by default in production; the suite needs it to create users.
+process.env.SIGNUP_ENABLED = "true"
 
 await import("../src/index.js")
 

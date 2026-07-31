@@ -96,6 +96,8 @@
     }
   html {
     @apply font-sans;
+    /* Installed to a home screen, the grey tap flash reads as "web page". */
+    -webkit-tap-highlight-color: transparent;
     }
 
   input[type="number"]::-webkit-inner-spin-button,

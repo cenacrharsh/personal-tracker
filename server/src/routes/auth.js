@@ -9,7 +9,17 @@ const router = Router()
 
 const publicUser = (u) => ({ id: u._id, email: u.email, name: u.name })
 
-router.post("/signup", validate(signupSchema), async (req, res) => {
+// Signup is the only unauthenticated write path into the database, and bcrypt
+// makes each call expensive on purpose. Closed unless explicitly enabled: turn
+// SIGNUP_ENABLED on, register, turn it back off.
+const requireSignupEnabled = (req, res, next) => {
+  if (process.env.SIGNUP_ENABLED !== "true") {
+    return res.status(403).json({ error: "Signup is disabled" })
+  }
+  next()
+}
+
+router.post("/signup", requireSignupEnabled, validate(signupSchema), async (req, res) => {
   const { email, password, name } = req.body
   const existing = await User.findOne({ email: String(email).toLowerCase() })
   if (existing) return res.status(409).json({ error: "Email already registered" })

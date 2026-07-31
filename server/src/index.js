@@ -36,6 +36,11 @@ const corsOrigin = (origin, cb) => {
 }
 
 const app = express()
+// Render terminates TLS at its own proxy, so without this every request looks
+// like it came from that proxy and the rate limiters below key the whole
+// internet into one bucket. `1` (trust one hop) rather than `true`, which would
+// let a client spoof X-Forwarded-For and rotate past the limiter at will.
+app.set("trust proxy", 1)
 app.use(helmet())
 app.use(cors({ origin: corsOrigin, credentials: true }))
 app.use(express.json({ limit: "2mb" }))

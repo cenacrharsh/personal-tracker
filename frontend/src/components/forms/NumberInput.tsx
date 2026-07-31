@@ -41,7 +41,9 @@ export function NumberInput({
   return (
     <Input
       type="number"
-      inputMode="numeric"
+      // "decimal" over "numeric": the mobile keypad then carries a decimal
+      // separator, which amounts here need and the parser below already accepts.
+      inputMode="decimal"
       aria-label={ariaLabel}
       disabled={disabled}
       min={min}

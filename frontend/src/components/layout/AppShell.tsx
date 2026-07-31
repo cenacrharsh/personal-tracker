@@ -78,18 +78,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
 
         {/* Main content */}
-        <main className="min-w-0 flex-1 pb-24 md:pb-6">
+        <main className="min-w-0 flex-1 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
           <div className="mx-auto max-w-[1240px] px-4 py-4 md:px-8 md:py-6">{children}</div>
         </main>
       </div>
 
       {/* Mobile sync indicator */}
-      <div className="fixed right-3 top-3 z-20 md:hidden">
+      <div className="fixed right-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-20 md:hidden">
         <SyncBadge />
       </div>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-background/85 backdrop-blur-md md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-background/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
         <div className="grid grid-cols-7">
           {NAV.map(({ path, label, icon: Icon }) => {
             const active = isActive(path)
