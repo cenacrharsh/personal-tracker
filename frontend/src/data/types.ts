@@ -75,16 +75,13 @@ export type BillsData = {
   insurance: Record<string, BillStatus>
 }
 
-export type ActivityKey = "gym" | "badminton"
+export type ActivityKey = string
 
 export type ActivityTracker = {
   entries: string[] // sorted "YYYY-MM-DD" date strings
 }
 
-export type TrackersData = {
-  gym: ActivityTracker
-  badminton: ActivityTracker
-}
+export type TrackersData = Record<ActivityKey, ActivityTracker>
 
 export type VitalsReport = {
   date: string // "YYYY-MM-DD"

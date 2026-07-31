@@ -6,11 +6,14 @@ import { trackersSchema, validate } from "../validation.js"
 
 const router = Router()
 
-// Per-activity characteristics. Gym has a weekly goal; badminton is goal-free.
-// Adding an activity later is just another entry here.
+// Per-activity characteristics. "good" trackers carry a weekly goal to hit,
+// "bad" ones a weekly limit to stay under. Adding a tracker later is just
+// another entry here plus a matching def in the frontend TrackersPage.
 const ACTIVITY_DEFS = {
-  gym: { title: "Gym", type: "daily-boolean", config: { weeklyGoal: 3 } },
-  badminton: { title: "Badminton", type: "daily-boolean", config: {} },
+  gym: { title: "Gym", type: "daily-boolean", config: { polarity: "good", weeklyGoal: 3 } },
+  badminton: { title: "Badminton", type: "daily-boolean", config: { polarity: "good" } },
+  junk: { title: "Junk food", type: "daily-boolean", config: { polarity: "bad", weeklyLimit: 2 } },
+  social: { title: "Social media", type: "daily-boolean", config: { polarity: "bad", weeklyLimit: 2 } },
 }
 const ACTIVITY_KEYS = Object.keys(ACTIVITY_DEFS)
 
