@@ -181,14 +181,14 @@ export function TrackersPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className={`flex size-10 items-center justify-center rounded-xl ${activeDef.iconBg} ${activeDef.text}`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${activeDef.iconBg} ${activeDef.text}`}>
             <ActiveIcon className="size-5" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-xl font-bold tracking-tight">Activity Log</h1>
-            <p className="text-xs text-muted-foreground">{activeDef.label} • {activeDef.subtitle}</p>
+            <p className="truncate text-xs text-muted-foreground">{activeDef.label} • {activeDef.subtitle}</p>
           </div>
         </div>
         <YearPicker
@@ -239,7 +239,7 @@ export function TrackersPage() {
               <div className="text-[11px] uppercase tracking-wider text-muted-foreground">All activities combined</div>
             </div>
           </div>
-          <div className="grid grid-cols-2 divide-x divide-white/10">
+          <div className="grid w-full grid-cols-2 divide-x divide-white/10 sm:w-auto">
             <div className="flex flex-col items-center px-5 sm:px-7">
               <div className="bg-linear-to-br from-green-300 to-sky-300 bg-clip-text text-4xl font-black tabular-nums leading-none text-transparent">
                 {monthActiveDays}
@@ -280,6 +280,9 @@ export function TrackersPage() {
           value={yearCount}
           unit="sessions"
           borderClass={activeDef.border}
+          // Third of three cards: fills the second row instead of sitting
+          // orphaned at half width on a phone.
+          className="col-span-2 sm:col-span-1"
         />
       </div>
 
@@ -319,9 +322,11 @@ export function TrackersPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 sm:gap-5">
+        {/* Stacked on phones: side by side, the fixed-width ring squeezes the seven
+            day buttons down to ~17px each and the labels collapse. */}
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-5">
           {/* Day buttons (color-coded for both activities) */}
-          <div className="grid flex-1 grid-cols-7 gap-1.5 sm:gap-2">
+          <div className="grid w-full grid-cols-7 gap-1.5 sm:flex-1 sm:gap-2">
             {weekDates.map((date, i) => {
               const key = weekKeys[i]
               const isToday = key === today
@@ -442,7 +447,7 @@ export function TrackersPage() {
                     key={key}
                     onClick={() => !isFuture && toggleDay(activeActivity, key)}
                     disabled={isFuture}
-                    className={`relative flex h-9 w-full items-center justify-center rounded-lg text-sm font-medium transition-all duration-150 sm:h-10 ${
+                    className={`relative flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-all duration-150 sm:h-10 ${
                       marked
                         ? "text-foreground"
                         : isToday
@@ -470,7 +475,7 @@ export function TrackersPage() {
         </div>
 
         {/* Month summary + legend (both activities) */}
-        <div className="mt-4 flex items-center justify-between border-t border-border/40 pt-4">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-border/40 pt-4">
           <span className="text-xs text-muted-foreground">
             {gymMonth} gym · {badmintonMonth} badminton this month
           </span>
@@ -496,15 +501,17 @@ function StatCard({
   value,
   unit,
   borderClass,
+  className = "",
 }: {
   icon: React.ReactNode
   label: string
   value: number
   unit: string
   borderClass: string
+  className?: string
 }) {
   return (
-    <div className={`rounded-xl border bg-card/60 p-4 backdrop-blur ${borderClass}`}>
+    <div className={`rounded-xl border bg-card/60 p-4 backdrop-blur ${borderClass} ${className}`}>
       <div className="mb-2 flex items-center gap-1.5">
         {icon}
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
