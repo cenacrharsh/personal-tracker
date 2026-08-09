@@ -42,6 +42,7 @@ const insuranceSchema = z.object({
 export const portfolioSchema = z.object({
   age: nonNeg.optional(),
   monthlyIncome: nonNeg.optional(),
+  monthlyExpenses: nonNeg.optional(),
   silverEnabled: z.boolean().optional(),
   zerodhaTotal: nonNeg.optional(),
   zerodhaGoldEtf: nonNeg.optional(),
@@ -52,7 +53,12 @@ export const portfolioSchema = z.object({
   fdAmount: nonNeg.optional(),
   rdAmount: nonNeg.optional(),
   epfPpfAmount: nonNeg.optional(),
+  bondsAmount: nonNeg.optional(),
+  npsAmount: nonNeg.optional(),
   currentEmergencyFund: nonNeg.optional(),
+  emergencyFdAmount: nonNeg.optional(),
+  emergencyRdAmount: nonNeg.optional(),
+  emergencyMonthsTarget: z.number().int().min(6).max(12).optional(),
   lifeInsurance: insuranceSchema.optional(),
   healthInsurance: insuranceSchema.optional(),
 })

@@ -7,9 +7,17 @@ import { StatTile } from "@/components/primitives/StatTile"
 import { EmptyState } from "@/components/primitives/EmptyState"
 import { ConfirmDialog } from "@/components/primitives/ConfirmDialog"
 import { useVitalsStore } from "@/store/useVitalsStore"
-import type { VitalsReport } from "@/data/types"
+import type { VitalMetricDef, VitalsReport } from "@/data/types"
 import { VITALS_CATALOG } from "@/lib/vitalsCatalog"
-import { formatMetricValue, metricStatus, statusArrow } from "@/lib/vitals"
+import {
+  formatMetricValue,
+  formatRange,
+  isOutOfRange,
+  metricStatus,
+  statusArrow,
+  STATUS_LABEL,
+  type MetricStatus,
+} from "@/lib/vitals"
 import { ReportDialog } from "@/components/pages/vitals/ReportDialog"
 import { ReportsMatrix } from "@/components/pages/vitals/ReportsMatrix"
 import { MetricTrend } from "@/components/pages/vitals/MetricTrend"
@@ -18,6 +26,48 @@ function formatDate(dateStr: string): string {
   const d = new Date(dateStr)
   if (Number.isNaN(d.getTime())) return dateStr
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+}
+
+const STATUS_RANK: Record<MetricStatus, number> = { low: 0, high: 0, borderline: 1, ok: 2 }
+
+function formatMonthYear(dateStr: string): string {
+  const d = new Date(dateStr)
+  if (Number.isNaN(d.getTime())) return dateStr
+  return d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" })
+}
+
+// A flagged metric, tinted by severity. Carries the reading's date when it
+// came from an older report than the newest one.
+function MetricChip({
+  metric,
+  value,
+  status,
+  date,
+  isLatest,
+}: {
+  metric: VitalMetricDef
+  value: number
+  status: MetricStatus
+  date: string
+  isLatest: boolean
+}) {
+  const tone = isOutOfRange(status)
+    ? "bg-rose-500/15 text-rose-300"
+    : status === "borderline"
+      ? "bg-amber-500/15 text-amber-300"
+      : "bg-emerald-500/10 text-emerald-300"
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${tone}`}
+      title={`${STATUS_LABEL[status]} · reference ${formatRange(metric.range)} ${metric.unit} · measured ${formatDate(date)}`}
+    >
+      {metric.shortLabel ?? metric.label} {formatMetricValue(value, metric.decimals)}{" "}
+      {statusArrow(status)}
+      {isLatest ? null : (
+        <span className="font-normal opacity-70">· {formatMonthYear(date)}</span>
+      )}
+    </span>
+  )
 }
 
 export function VitalsPage() {
@@ -31,24 +81,33 @@ export function VitalsPage() {
   const [reportPendingDelete, setReportPendingDelete] = useState<VitalsReport | null>(null)
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null)
 
-  const latest = useMemo(
-    () => (reports.length ? [...reports].sort((a, b) => b.date.localeCompare(a.date))[0] : null),
+  const newestFirst = useMemo(
+    () => [...reports].sort((a, b) => b.date.localeCompare(a.date)),
     [reports],
   )
+  const latest = newestFirst[0] ?? null
 
+  // Panels differ from lab to lab, so a single report is never the full picture.
+  // Each metric is judged on its most recent measurement, whenever that was.
   const latestSummary = useMemo(() => {
-    if (!latest) return null
-    const entries = Object.entries(latest.results)
-    const flagged = entries
-      .map(([key, value]) => {
-        const metric = VITALS_CATALOG.find((m) => m.key === key)
-        if (!metric) return null
-        const status = metricStatus(value, metric.range)
-        return status === "ok" ? null : { metric, value, status }
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null)
-    return { total: entries.length, inRange: entries.length - flagged.length, flagged }
-  }, [latest])
+    if (newestFirst.length === 0) return null
+    const evaluated = VITALS_CATALOG.map((metric) => {
+      const source = newestFirst.find((r) => r.results[metric.key] !== undefined)
+      if (!source) return null
+      const value = source.results[metric.key]
+      return { metric, value, date: source.date, status: metricStatus(value, metric.range) }
+    }).filter((x): x is NonNullable<typeof x> => x !== null)
+    const outOfRange = evaluated.filter((e) => isOutOfRange(e.status)).length
+    const borderline = evaluated.filter((e) => e.status === "borderline").length
+    return {
+      total: evaluated.length,
+      inRange: evaluated.length - outOfRange,
+      outOfRange,
+      borderline,
+      // Worst first; the sort is stable, so each band keeps its panel order.
+      chips: [...evaluated].sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status]),
+    }
+  }, [newestFirst])
 
   const openAdd = () => {
     setEditingReport(null)
@@ -97,25 +156,30 @@ export function VitalsPage() {
         <>
           {latest && latestSummary ? (
             <StatTile
-              label={`Latest report · ${formatDate(latest.date)}${latest.lab ? ` · ${latest.lab}` : ""}`}
+              label={`Latest values · as of ${formatDate(latest.date)}${latest.lab ? ` · ${latest.lab}` : ""}`}
               value={`${latestSummary.inRange} of ${latestSummary.total} in range`}
-              tone={latestSummary.flagged.length === 0 ? "positive" : "negative"}
+              tone={latestSummary.outOfRange === 0 && latestSummary.borderline === 0 ? "positive" : "default"}
               icon={<HeartPulse className="size-4" />}
+              sub={[
+                latestSummary.outOfRange > 0 ? `${latestSummary.outOfRange} out of range` : null,
+                latestSummary.borderline > 0 ? `${latestSummary.borderline} borderline` : null,
+                `latest reading per metric across ${reports.length} report${reports.length === 1 ? "" : "s"}`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             >
-              {latestSummary.flagged.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {latestSummary.flagged.map(({ metric, value, status }) => (
-                    <span
-                      key={metric.key}
-                      className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-medium text-rose-300"
-                    >
-                      {metric.shortLabel ?? metric.label} {formatMetricValue(value, metric.decimals)} {statusArrow(status)}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">Everything tested came back within range.</p>
-              )}
+              <div className="flex flex-wrap gap-1.5">
+                {latestSummary.chips.map(({ metric, value, status, date }) => (
+                  <MetricChip
+                    key={metric.key}
+                    metric={metric}
+                    value={value}
+                    status={status}
+                    date={date}
+                    isLatest={date === latest.date}
+                  />
+                ))}
+              </div>
             </StatTile>
           ) : null}
 

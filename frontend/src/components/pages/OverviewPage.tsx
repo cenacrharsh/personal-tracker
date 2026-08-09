@@ -4,8 +4,8 @@ import {
   CalendarClock,
   Coins,
   HeartPulse,
+  LifeBuoy,
   LineChart as LineChartIcon,
-  PiggyBank,
   ShieldCheck,
   Sparkles,
   TrendingUp,
@@ -32,15 +32,17 @@ import { AXIS_TICK, CHART_GRID_STROKE, CHART_TOOLTIP_STYLE } from "@/components/
 import { daysUntil } from "@/lib/dates"
 import { formatCompactINR, formatINR, formatPercent } from "@/lib/money"
 import {
+  clampEmergencyMonths,
   computeCurrentAllocationPercents,
   computeEmergencyFundDelta,
+  computeEmergencyFundTotal,
   computeTargetAllocationPercents,
   computeTargetEmergencyFund,
   computeTotals,
   type AllocationCategory,
   type PortfolioInputs,
 } from "@/lib/portfolioMath"
-import { ASSET_COLORS, ASSET_LABELS } from "@/lib/tokens"
+import { ASSET_COLORS, ASSET_LABELS, goalColor } from "@/lib/tokens"
 import { usePortfolioStore } from "@/store/usePortfolioStore"
 import type { Snapshot } from "@/data"
 
@@ -74,7 +76,11 @@ export function OverviewPage() {
       fdAmount: store.fdAmount,
       rdAmount: store.rdAmount,
       epfPpfAmount: store.epfPpfAmount,
+      bondsAmount: store.bondsAmount,
+      npsAmount: store.npsAmount,
       currentEmergencyFund: store.currentEmergencyFund,
+      emergencyFdAmount: store.emergencyFdAmount,
+      emergencyRdAmount: store.emergencyRdAmount,
     }),
     [
       store.age,
@@ -89,7 +95,11 @@ export function OverviewPage() {
       store.fdAmount,
       store.rdAmount,
       store.epfPpfAmount,
+      store.bondsAmount,
+      store.npsAmount,
       store.currentEmergencyFund,
+      store.emergencyFdAmount,
+      store.emergencyRdAmount,
     ],
   )
 
@@ -97,11 +107,14 @@ export function OverviewPage() {
   const current = useMemo(() => computeCurrentAllocationPercents(inputs), [inputs])
   const target = useMemo(() => computeTargetAllocationPercents(inputs), [inputs])
 
-  const targetEmergency = computeTargetEmergencyFund(store.monthlyIncome)
-  const efDelta = computeEmergencyFundDelta(store.currentEmergencyFund, store.monthlyIncome)
-  const efProgress =
-    targetEmergency > 0 ? Math.min(100, (store.currentEmergencyFund / targetEmergency) * 100) : 0
-  const efMonths = store.monthlyIncome > 0 ? store.currentEmergencyFund / store.monthlyIncome : 0
+  const efTotal = computeEmergencyFundTotal(inputs)
+  const efMonthsTarget = clampEmergencyMonths(store.emergencyMonthsTarget)
+  const targetEmergency = computeTargetEmergencyFund(store.monthlyIncome, efMonthsTarget)
+  const efDelta = computeEmergencyFundDelta(efTotal, store.monthlyIncome, efMonthsTarget)
+  const efProgress = targetEmergency > 0 ? Math.min(100, (efTotal / targetEmergency) * 100) : 0
+  const efMonths = store.monthlyIncome > 0 ? efTotal / store.monthlyIncome : 0
+  const efColor = goalColor(efProgress)
+  const efExpenseMonths = store.monthlyExpenses > 0 ? efTotal / store.monthlyExpenses : 0
 
   const filtered = useMemo(
     () => filterSnapshotsByRange(store.snapshots, range),
@@ -434,15 +447,18 @@ export function OverviewPage() {
         <Card className="flex flex-col rounded-2xl border-border/60 bg-card/85">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
-              <PiggyBank className="size-4 text-cyan-300" />
+              <LifeBuoy className="size-4" style={{ color: efColor }} />
               Emergency Fund
             </CardTitle>
             <div className="text-xs text-muted-foreground">
-              Target 6× monthly income
+              Target {efMonthsTarget}× monthly income
+              {store.monthlyExpenses > 0
+                ? ` · covers ${efExpenseMonths.toFixed(1)} months of expenses`
+                : ""}
             </div>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col items-center justify-center gap-5">
-            <RingProgress percent={efProgress} size={128} stroke={8} color="#06b6d4">
+            <RingProgress percent={efProgress} size={128} stroke={8} color={efColor}>
               <div className="flex flex-col items-center">
                 <div className="text-xl font-semibold">{efMonths.toFixed(1)}</div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">months</div>
@@ -453,9 +469,7 @@ export function OverviewPage() {
                 <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   Current
                 </div>
-                <div className="text-base font-semibold">
-                  {formatINR(store.currentEmergencyFund)}
-                </div>
+                <div className="text-base font-semibold">{formatINR(efTotal)}</div>
               </div>
               <div>
                 <div className="text-[11px] uppercase tracking-wide text-muted-foreground">

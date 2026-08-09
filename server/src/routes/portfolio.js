@@ -6,11 +6,12 @@ import { portfolioSchema, validate } from "../validation.js"
 const router = Router()
 
 const FIELDS = [
-  "age", "monthlyIncome", "silverEnabled",
+  "age", "monthlyIncome", "monthlyExpenses", "silverEnabled",
   "zerodhaTotal", "zerodhaGoldEtf", "zerodhaSilverEtf",
   "mfTotal", "mfGold", "mfSilver",
-  "fdAmount", "rdAmount", "epfPpfAmount",
-  "currentEmergencyFund", "lifeInsurance", "healthInsurance",
+  "fdAmount", "rdAmount", "epfPpfAmount", "bondsAmount", "npsAmount",
+  "currentEmergencyFund", "emergencyFdAmount", "emergencyRdAmount", "emergencyMonthsTarget",
+  "lifeInsurance", "healthInsurance",
 ]
 
 function toClient(doc) {

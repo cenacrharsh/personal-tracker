@@ -51,7 +51,7 @@ export const VITALS_CATALOG: VitalMetricDef[] = [
 
   // --- Vitamins ---
   { key: "vitamin-d", label: "Vitamin D (25-OH)", shortLabel: "Vitamin D", unit: "ng/mL", range: { low: 30, high: 100 }, panel: "vitamins", core: true },
-  { key: "vitamin-b12", label: "Vitamin B-12", shortLabel: "B-12", unit: "pg/mL", range: { low: 211, high: 911 }, panel: "vitamins", core: true, decimals: 0 },
+  { key: "vitamin-b12", label: "Vitamin B-12", unit: "pg/mL", range: { low: 211, high: 911 }, panel: "vitamins", core: true, decimals: 0 },
 
   // --- Iron Studies ---
   { key: "iron", label: "Iron (Serum)", unit: "µg/dL", range: { low: 65, high: 175 }, panel: "iron", core: true },

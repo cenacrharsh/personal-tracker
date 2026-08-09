@@ -27,6 +27,7 @@ export type CreditCardYearData = Record<string, CreditCardMonthlyEntry>
 export type PortfolioData = {
   age: number
   monthlyIncome: number
+  monthlyExpenses: number
   silverEnabled: boolean
 
   zerodhaTotal: number
@@ -40,8 +41,15 @@ export type PortfolioData = {
   fdAmount: number
   rdAmount: number
   epfPpfAmount: number
+  bondsAmount: number
+  npsAmount: number
 
+  // Emergency fund parts — kept out of the portfolio allocation. The fund total
+  // is the sum of the liquid balance plus its own FDs and RDs.
   currentEmergencyFund: number
+  emergencyFdAmount: number
+  emergencyRdAmount: number
+  emergencyMonthsTarget: number
 
   lifeInsurance: InsuranceDetails
   healthInsurance: InsuranceDetails

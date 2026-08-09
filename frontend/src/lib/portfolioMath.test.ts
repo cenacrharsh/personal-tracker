@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  clampEmergencyMonths,
   computeCurrentAllocationPercents,
   computeEmergencyFundDelta,
+  computeEmergencyFundTotal,
   computeTargetAllocationPercents,
   computeTargetEmergencyFund,
   computeTotals,
@@ -22,7 +24,11 @@ const base: PortfolioInputs = {
   fdAmount: 50000,
   rdAmount: 0,
   epfPpfAmount: 50000,
+  bondsAmount: 0,
+  npsAmount: 0,
   currentEmergencyFund: 300000,
+  emergencyFdAmount: 0,
+  emergencyRdAmount: 0,
 }
 
 describe("computeTotals", () => {
@@ -34,6 +40,12 @@ describe("computeTotals", () => {
     expect(t.totalEquity).toBe(170000)
     expect(t.totalDebt).toBe(100000)
     expect(t.totalPortfolioValue).toBe(300000)
+  })
+
+  it("counts bonds and NPS as debt", () => {
+    const t = computeTotals({ ...base, bondsAmount: 25000, npsAmount: 75000 })
+    expect(t.totalDebt).toBe(200000)
+    expect(t.totalPortfolioValue).toBe(400000)
   })
 
   it("excludes silver holdings when silver is disabled", () => {
@@ -85,12 +97,35 @@ describe("allocation percents", () => {
 })
 
 describe("emergency fund", () => {
-  it("targets 6x monthly income", () => {
+  it("targets 6x monthly income by default", () => {
     expect(computeTargetEmergencyFund(100000)).toBe(600000)
+  })
+
+  it("scales the target by the chosen months", () => {
+    expect(computeTargetEmergencyFund(100000, 12)).toBe(1200000)
+    expect(computeTargetEmergencyFund(100000, 9)).toBe(900000)
+  })
+
+  it("clamps the months multiplier to 6-12", () => {
+    expect(clampEmergencyMonths(3)).toBe(6)
+    expect(clampEmergencyMonths(20)).toBe(12)
+    expect(clampEmergencyMonths(Number.NaN)).toBe(6)
+    expect(computeTargetEmergencyFund(100000, 0)).toBe(600000)
+  })
+
+  it("sums the liquid balance with its FDs and RDs", () => {
+    expect(
+      computeEmergencyFundTotal({
+        currentEmergencyFund: 200000,
+        emergencyFdAmount: 150000,
+        emergencyRdAmount: 50000,
+      }),
+    ).toBe(400000)
   })
 
   it("delta is current minus target", () => {
     expect(computeEmergencyFundDelta(300000, 100000)).toBe(-300000)
     expect(computeEmergencyFundDelta(700000, 100000)).toBe(100000)
+    expect(computeEmergencyFundDelta(700000, 100000, 12)).toBe(-500000)
   })
 })

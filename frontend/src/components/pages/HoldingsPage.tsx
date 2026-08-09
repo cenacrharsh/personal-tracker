@@ -1,20 +1,23 @@
 import type { ReactNode } from "react"
-import { Banknote, Coins, LineChart, PiggyBank, ShieldAlert, Sparkles } from "lucide-react"
+import { Banknote, Coins, LifeBuoy, LineChart, ShieldAlert, Sparkles } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Progress } from "@/components/ui/progress"
 import { NumberInput } from "@/components/forms/NumberInput"
 import { formatCompactINR, formatINR, formatPercent } from "@/lib/money"
 import {
+  clampEmergencyMonths,
   computeCurrentAllocationPercents,
+  computeEmergencyFundTotal,
   computeTargetAllocationPercents,
   computeTargetEmergencyFund,
   computeTotals,
+  EMERGENCY_MONTHS_MAX,
+  EMERGENCY_MONTHS_MIN,
   type AllocationCategory,
   type PortfolioInputs,
 } from "@/lib/portfolioMath"
-import { ASSET_COLORS, ASSET_LABELS } from "@/lib/tokens"
+import { ASSET_COLORS, ASSET_LABELS, goalColor } from "@/lib/tokens"
 import { usePortfolioStore } from "@/store/usePortfolioStore"
 
 function GroupCard({
@@ -80,6 +83,28 @@ function Field({
   )
 }
 
+// Label beside a narrow input — lets a card hold more rows without growing taller
+// than the cards next to it.
+function RowField({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children: ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <Label className="text-xs text-muted-foreground">{label}</Label>
+        {hint ? <div className="text-[10px] text-muted-foreground/70">{hint}</div> : null}
+      </div>
+      <div className="w-28 shrink-0 sm:w-32">{children}</div>
+    </div>
+  )
+}
+
 export function HoldingsPage() {
   const store = usePortfolioStore()
 
@@ -96,7 +121,11 @@ export function HoldingsPage() {
     fdAmount: store.fdAmount,
     rdAmount: store.rdAmount,
     epfPpfAmount: store.epfPpfAmount,
+    bondsAmount: store.bondsAmount,
+    npsAmount: store.npsAmount,
     currentEmergencyFund: store.currentEmergencyFund,
+    emergencyFdAmount: store.emergencyFdAmount,
+    emergencyRdAmount: store.emergencyRdAmount,
   }
 
   const totals = computeTotals(inputs)
@@ -106,9 +135,12 @@ export function HoldingsPage() {
   const zerodhaWarn = store.zerodhaGoldEtf + store.zerodhaSilverEtf > store.zerodhaTotal
   const mfWarn = store.mfGold + store.mfSilver > store.mfTotal
 
-  const targetEmergency = computeTargetEmergencyFund(store.monthlyIncome)
-  const efProgress =
-    targetEmergency > 0 ? Math.min(100, (store.currentEmergencyFund / targetEmergency) * 100) : 0
+  const efTotal = computeEmergencyFundTotal(inputs)
+  const efMonthsTarget = clampEmergencyMonths(store.emergencyMonthsTarget)
+  const targetEmergency = computeTargetEmergencyFund(store.monthlyIncome, efMonthsTarget)
+  const efProgress = targetEmergency > 0 ? Math.min(100, (efTotal / targetEmergency) * 100) : 0
+  const efColor = goalColor(efProgress)
+  const expenseMonths = store.monthlyExpenses > 0 ? efTotal / store.monthlyExpenses : 0
 
   // Sub-allocation breakdowns per asset class (for the contribution bar inside each tile)
   const equityFromZerodha = Math.max(
@@ -123,7 +155,7 @@ export function HoldingsPage() {
   const classTiles: ClassTile[] = [
     {
       key: "equity",
-      icon: <LineChart className="size-4" />,
+      icon: <LineChart className="size-5" />,
       amount: totals.totalEquity,
       currentPct: currentPercents.equity,
       targetPct: targetPercents.equity,
@@ -134,7 +166,7 @@ export function HoldingsPage() {
     },
     {
       key: "gold",
-      icon: <Coins className="size-4" />,
+      icon: <Coins className="size-5" />,
       amount: totals.totalGold,
       currentPct: currentPercents.gold,
       targetPct: targetPercents.gold,
@@ -147,7 +179,7 @@ export function HoldingsPage() {
       ? [
           {
             key: "silver" as const,
-            icon: <Coins className="size-4" />,
+            icon: <Coins className="size-5" />,
             amount: totals.totalSilver,
             currentPct: currentPercents.silver,
             targetPct: targetPercents.silver,
@@ -160,7 +192,7 @@ export function HoldingsPage() {
       : []),
     {
       key: "debt",
-      icon: <Banknote className="size-4" />,
+      icon: <Banknote className="size-5" />,
       amount: totals.totalDebt,
       currentPct: currentPercents.debt,
       targetPct: targetPercents.debt,
@@ -168,6 +200,8 @@ export function HoldingsPage() {
         { label: "FD", amount: store.fdAmount },
         { label: "RD", amount: store.rdAmount },
         { label: "EPF/PPF", amount: store.epfPpfAmount },
+        { label: "Bonds", amount: store.bondsAmount },
+        { label: "NPS", amount: store.npsAmount },
       ],
     },
   ]
@@ -198,7 +232,7 @@ export function HoldingsPage() {
           subtitle="Direct stocks + ETFs"
           total={store.zerodhaTotal}
           accent={ASSET_COLORS.equity}
-          icon={<LineChart className="size-4" />}
+          icon={<LineChart className="size-5" />}
         >
           <Field label="Total invested">
             <NumberInput
@@ -242,7 +276,7 @@ export function HoldingsPage() {
           subtitle="Equity / Gold / Silver schemes"
           total={store.mfTotal}
           accent={ASSET_COLORS.equity}
-          icon={<LineChart className="size-4" />}
+          icon={<LineChart className="size-5" />}
         >
           <Field label="Total invested">
             <NumberInput
@@ -286,9 +320,9 @@ export function HoldingsPage() {
           subtitle="Fixed-income instruments"
           total={totals.totalDebt}
           accent={ASSET_COLORS.debt}
-          icon={<Banknote className="size-4" />}
+          icon={<Banknote className="size-5" />}
         >
-          <Field label="Fixed Deposits">
+          <RowField label="Fixed Deposits">
             <NumberInput
               value={store.fdAmount}
               onChange={store.setFdAmount}
@@ -296,8 +330,8 @@ export function HoldingsPage() {
               step={1000}
               ariaLabel="FD amount"
             />
-          </Field>
-          <Field label="Recurring Deposits">
+          </RowField>
+          <RowField label="Recurring Deposits">
             <NumberInput
               value={store.rdAmount}
               onChange={store.setRdAmount}
@@ -305,8 +339,8 @@ export function HoldingsPage() {
               step={500}
               ariaLabel="RD amount"
             />
-          </Field>
-          <Field label="EPF / PPF">
+          </RowField>
+          <RowField label="EPF / PPF">
             <NumberInput
               value={store.epfPpfAmount}
               onChange={store.setEpfPpfAmount}
@@ -314,38 +348,108 @@ export function HoldingsPage() {
               step={1000}
               ariaLabel="EPF/PPF amount"
             />
-          </Field>
+          </RowField>
+          <RowField label="Bonds">
+            <NumberInput
+              value={store.bondsAmount}
+              onChange={store.setBondsAmount}
+              min={0}
+              step={1000}
+              ariaLabel="Bonds amount"
+            />
+          </RowField>
+          <RowField label="NPS">
+            <NumberInput
+              value={store.npsAmount}
+              onChange={store.setNpsAmount}
+              min={0}
+              step={1000}
+              ariaLabel="NPS amount"
+            />
+          </RowField>
         </GroupCard>
 
         <GroupCard
           title="Emergency Fund"
-          subtitle="Liquid cash buffer"
-          total={store.currentEmergencyFund}
-          accent="#06b6d4"
-          icon={<PiggyBank className="size-4" />}
+          subtitle="Liquid cash + earmarked deposits"
+          total={efTotal}
+          accent={efColor}
+          icon={<LifeBuoy className="size-5" />}
         >
-          <Field
-            label="Current balance"
-            hint={`Target ${formatCompactINR(targetEmergency)}`}
-          >
+          <RowField label="Savings / Liquid">
             <NumberInput
               value={store.currentEmergencyFund}
               onChange={store.setCurrentEmergencyFund}
               min={0}
               step={1000}
-              ariaLabel="Emergency fund"
+              ariaLabel="Emergency fund liquid balance"
             />
-          </Field>
+          </RowField>
+          <RowField label="Fixed Deposits">
+            <NumberInput
+              value={store.emergencyFdAmount}
+              onChange={store.setEmergencyFdAmount}
+              min={0}
+              step={1000}
+              ariaLabel="Emergency fund FD"
+            />
+          </RowField>
+          <RowField label="Recurring Deposits">
+            <NumberInput
+              value={store.emergencyRdAmount}
+              onChange={store.setEmergencyRdAmount}
+              min={0}
+              step={500}
+              ariaLabel="Emergency fund RD"
+            />
+          </RowField>
+          <RowField label="Monthly expenses" hint="Used for coverage below">
+            <NumberInput
+              value={store.monthlyExpenses}
+              onChange={store.setMonthlyExpenses}
+              min={0}
+              step={1000}
+              ariaLabel="Monthly expenses"
+            />
+          </RowField>
+
+          <div className="space-y-1.5 border-t border-border/60 pt-3">
+            <div className="flex items-center justify-between gap-3">
+              <Label className="text-xs text-muted-foreground">Target cover</Label>
+              <span className="text-xs font-medium">
+                {efMonthsTarget}× income · {formatCompactINR(targetEmergency)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground">{EMERGENCY_MONTHS_MIN}×</span>
+              <input
+                type="range"
+                min={EMERGENCY_MONTHS_MIN}
+                max={EMERGENCY_MONTHS_MAX}
+                step={1}
+                value={efMonthsTarget}
+                onChange={(e) => store.setEmergencyMonthsTarget(Number(e.target.value))}
+                style={{ accentColor: efColor }}
+                className="flex-1 cursor-pointer"
+                aria-label="Emergency fund target months of income"
+              />
+              <span className="text-[10px] text-muted-foreground">{EMERGENCY_MONTHS_MAX}×</span>
+            </div>
+          </div>
+
           <div className="space-y-1.5">
-            <Progress value={efProgress} className="h-2" />
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted/50">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${efProgress}%`, background: efColor }}
+              />
+            </div>
             <div className="flex justify-between text-[11px] text-muted-foreground">
-              <span>{efProgress.toFixed(0)}% of 6× monthly income</span>
+              <span style={{ color: efColor }}>{efProgress.toFixed(0)}% funded</span>
               <span>
-                {(targetEmergency > 0
-                  ? store.currentEmergencyFund / Math.max(1, store.monthlyIncome)
-                  : 0
-                ).toFixed(1)}{" "}
-                months
+                {store.monthlyExpenses > 0
+                  ? `${expenseMonths.toFixed(1)} months of expenses`
+                  : "Add expenses for coverage"}
               </span>
             </div>
           </div>
@@ -439,6 +543,8 @@ function ClassStatTile({ tile }: { tile: ClassTile }) {
       : "bg-indigo-500/15 text-indigo-300"
 
   const breakdownTotal = tile.breakdown.reduce((acc, b) => acc + Math.max(0, b.amount), 0)
+  // Fade evenly across however many parts the class has, so the last one stays visible.
+  const shade = (i: number) => 1 - i * (0.6 / Math.max(1, tile.breakdown.length - 1))
 
   return (
     <Card className="overflow-hidden rounded-2xl border-border/60 bg-card/85">
@@ -491,7 +597,7 @@ function ClassStatTile({ tile }: { tile: ClassTile }) {
                     style={{
                       width: `${pct}%`,
                       background: color,
-                      opacity: 1 - i * 0.25,
+                      opacity: shade(i),
                     }}
                     title={`${b.label} · ${formatPercent(pct)}`}
                   />
@@ -505,7 +611,7 @@ function ClassStatTile({ tile }: { tile: ClassTile }) {
                   <span key={b.label} className="inline-flex items-center gap-1">
                     <span
                       className="inline-block size-1.5 rounded-full"
-                      style={{ background: color, opacity: 1 - i * 0.25 }}
+                      style={{ background: color, opacity: shade(i) }}
                     />
                     {b.label}{" "}
                     <span className="text-foreground">{formatCompactINR(b.amount)}</span>

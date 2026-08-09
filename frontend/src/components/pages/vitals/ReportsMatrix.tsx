@@ -5,7 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { VitalsReport } from "@/data/types"
 import { VITALS_CATALOG } from "@/lib/vitalsCatalog"
-import { formatMetricValue, metricStatus, statusArrow, STATUS_TONE_CLASS } from "@/lib/vitals"
+import {
+  formatMetricValue,
+  formatRange,
+  metricStatus,
+  statusArrow,
+  STATUS_LABEL,
+  STATUS_TONE_CLASS,
+} from "@/lib/vitals"
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr)
@@ -47,12 +54,7 @@ export function ReportsMatrix({
                 >
                   <div>{m.shortLabel ?? m.label}</div>
                   <div className="text-[10px] font-normal text-muted-foreground">
-                    {m.range.low !== undefined && m.range.high !== undefined
-                      ? `${m.range.low}–${m.range.high}`
-                      : m.range.low !== undefined
-                        ? `> ${m.range.low}`
-                        : `< ${m.range.high}`}{" "}
-                    {m.unit}
+                    {formatRange(m.range)} {m.unit}
                   </div>
                 </button>
               </TableHead>
@@ -78,7 +80,11 @@ export function ReportsMatrix({
                 }
                 const status = metricStatus(value, m.range)
                 return (
-                  <TableCell key={m.key} className={STATUS_TONE_CLASS[status]}>
+                  <TableCell
+                    key={m.key}
+                    className={STATUS_TONE_CLASS[status]}
+                    title={`${STATUS_LABEL[status]} · reference ${formatRange(m.range)} ${m.unit}`}
+                  >
                     {formatMetricValue(value, m.decimals)} {statusArrow(status)}
                   </TableCell>
                 )

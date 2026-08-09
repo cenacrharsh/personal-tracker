@@ -21,10 +21,17 @@ export interface PortfolioInputs {
   fdAmount: number
   rdAmount: number
   epfPpfAmount: number
+  bondsAmount: number
+  npsAmount: number
 
   // Shields
   currentEmergencyFund: number
+  emergencyFdAmount: number
+  emergencyRdAmount: number
 }
+
+export const EMERGENCY_MONTHS_MIN = 6
+export const EMERGENCY_MONTHS_MAX = 12
 
 export interface PortfolioTotals {
   totalDebt: number
@@ -50,7 +57,11 @@ export function computeTotals(inputs: PortfolioInputs): PortfolioTotals {
   const silverMf = inputs.silverEnabled ? inputs.mfSilver : 0
 
   const totalDebt = clampNonNegative(
-    clampNumber(inputs.fdAmount) + clampNumber(inputs.rdAmount) + clampNumber(inputs.epfPpfAmount),
+    clampNumber(inputs.fdAmount) +
+      clampNumber(inputs.rdAmount) +
+      clampNumber(inputs.epfPpfAmount) +
+      clampNumber(inputs.bondsAmount) +
+      clampNumber(inputs.npsAmount),
   )
   const totalGold = clampNonNegative(clampNumber(inputs.zerodhaGoldEtf) + clampNumber(inputs.mfGold))
   const totalSilver = clampNonNegative(clampNumber(silverZerodha) + clampNumber(silverMf))
@@ -126,11 +137,33 @@ export function computeVariancePercents(
   }
 }
 
-export function computeTargetEmergencyFund(monthlyIncome: number) {
-  return clampNonNegative(clampNumber(monthlyIncome)) * 6
+export function clampEmergencyMonths(months: number) {
+  const n = clampNumber(months)
+  if (n < EMERGENCY_MONTHS_MIN) return EMERGENCY_MONTHS_MIN
+  if (n > EMERGENCY_MONTHS_MAX) return EMERGENCY_MONTHS_MAX
+  return Math.round(n)
 }
 
-export function computeEmergencyFundDelta(current: number, monthlyIncome: number) {
-  return clampNumber(current) - computeTargetEmergencyFund(monthlyIncome)
+// Liquid balance plus the FDs and RDs earmarked for the emergency fund.
+export function computeEmergencyFundTotal(
+  inputs: Pick<PortfolioInputs, "currentEmergencyFund" | "emergencyFdAmount" | "emergencyRdAmount">,
+) {
+  return clampNonNegative(
+    clampNumber(inputs.currentEmergencyFund) +
+      clampNumber(inputs.emergencyFdAmount) +
+      clampNumber(inputs.emergencyRdAmount),
+  )
+}
+
+export function computeTargetEmergencyFund(monthlyIncome: number, months = EMERGENCY_MONTHS_MIN) {
+  return clampNonNegative(clampNumber(monthlyIncome)) * clampEmergencyMonths(months)
+}
+
+export function computeEmergencyFundDelta(
+  current: number,
+  monthlyIncome: number,
+  months = EMERGENCY_MONTHS_MIN,
+) {
+  return clampNumber(current) - computeTargetEmergencyFund(monthlyIncome, months)
 }
 

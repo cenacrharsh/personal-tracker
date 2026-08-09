@@ -12,7 +12,12 @@ import {
   type PortfolioData,
   type Snapshot,
 } from "@/data"
-import { computeTotals, type PortfolioInputs } from "@/lib/portfolioMath"
+import {
+  clampEmergencyMonths,
+  computeEmergencyFundTotal,
+  computeTotals,
+  type PortfolioInputs,
+} from "@/lib/portfolioMath"
 import { clampNonNeg } from "@/lib/money"
 import { todayKey } from "@/lib/dates"
 import { trackSave } from "@/store/useSyncStore"
@@ -45,6 +50,7 @@ export type PortfolioState = PortfolioData & {
 
   setAge: (age: number) => void
   setMonthlyIncome: (v: number) => void
+  setMonthlyExpenses: (v: number) => void
   setSilverEnabled: (enabled: boolean) => void
 
   setZerodhaTotal: (v: number) => void
@@ -58,8 +64,13 @@ export type PortfolioState = PortfolioData & {
   setFdAmount: (v: number) => void
   setRdAmount: (v: number) => void
   setEpfPpfAmount: (v: number) => void
+  setBondsAmount: (v: number) => void
+  setNpsAmount: (v: number) => void
 
   setCurrentEmergencyFund: (v: number) => void
+  setEmergencyFdAmount: (v: number) => void
+  setEmergencyRdAmount: (v: number) => void
+  setEmergencyMonthsTarget: (v: number) => void
 
   setLifeInsurance: (details: Partial<InsuranceDetails>) => void
   setHealthInsurance: (details: Partial<InsuranceDetails>) => void
@@ -101,7 +112,8 @@ export const usePortfolioStore = create<PortfolioState>()((set) => ({
       repository.getBills(),
     ])
 
-    const loadedPortfolio = portfolio ?? DEFAULT_PORTFOLIO
+    // Spread over the defaults so data saved before a field existed still hydrates.
+    const loadedPortfolio = { ...DEFAULT_PORTFOLIO, ...(portfolio ?? {}) }
 
     set({
       ...loadedPortfolio,
@@ -119,6 +131,7 @@ export const usePortfolioStore = create<PortfolioState>()((set) => ({
 
   setAge: (age) => set({ age: clampNonNeg(age) }),
   setMonthlyIncome: (monthlyIncome) => set({ monthlyIncome: clampNonNeg(monthlyIncome) }),
+  setMonthlyExpenses: (v) => set({ monthlyExpenses: clampNonNeg(v) }),
   setSilverEnabled: (enabled) =>
     set(() =>
       enabled
@@ -139,8 +152,13 @@ export const usePortfolioStore = create<PortfolioState>()((set) => ({
   setFdAmount: (v) => set({ fdAmount: clampNonNeg(v) }),
   setRdAmount: (v) => set({ rdAmount: clampNonNeg(v) }),
   setEpfPpfAmount: (v) => set({ epfPpfAmount: clampNonNeg(v) }),
+  setBondsAmount: (v) => set({ bondsAmount: clampNonNeg(v) }),
+  setNpsAmount: (v) => set({ npsAmount: clampNonNeg(v) }),
 
   setCurrentEmergencyFund: (v) => set({ currentEmergencyFund: clampNonNeg(v) }),
+  setEmergencyFdAmount: (v) => set({ emergencyFdAmount: clampNonNeg(v) }),
+  setEmergencyRdAmount: (v) => set({ emergencyRdAmount: clampNonNeg(v) }),
+  setEmergencyMonthsTarget: (v) => set({ emergencyMonthsTarget: clampEmergencyMonths(v) }),
 
   setLifeInsurance: (details) =>
     set((s) => ({
@@ -296,6 +314,7 @@ function pickPortfolio(s: PortfolioState): PortfolioData {
   return {
     age: s.age,
     monthlyIncome: s.monthlyIncome,
+    monthlyExpenses: s.monthlyExpenses,
     silverEnabled: s.silverEnabled,
     zerodhaTotal: s.zerodhaTotal,
     zerodhaGoldEtf: s.zerodhaGoldEtf,
@@ -306,7 +325,12 @@ function pickPortfolio(s: PortfolioState): PortfolioData {
     fdAmount: s.fdAmount,
     rdAmount: s.rdAmount,
     epfPpfAmount: s.epfPpfAmount,
+    bondsAmount: s.bondsAmount,
+    npsAmount: s.npsAmount,
     currentEmergencyFund: s.currentEmergencyFund,
+    emergencyFdAmount: s.emergencyFdAmount,
+    emergencyRdAmount: s.emergencyRdAmount,
+    emergencyMonthsTarget: s.emergencyMonthsTarget,
     lifeInsurance: s.lifeInsurance,
     healthInsurance: s.healthInsurance,
   }
@@ -330,7 +354,7 @@ function snapshotFromState(s: PortfolioState): Snapshot {
     gold: totals.totalGold,
     silver: totals.totalSilver,
     debt: totals.totalDebt,
-    emergencyFund: s.currentEmergencyFund,
+    emergencyFund: computeEmergencyFundTotal(s),
   }
 }
 
@@ -427,7 +451,7 @@ usePortfolioStore.subscribe((state) => {
     scheduleBillsSave(usePortfolioStore.getState)
   }
 
-  const snapFp = `${state.zerodhaTotal}|${state.zerodhaGoldEtf}|${state.zerodhaSilverEtf}|${state.mfTotal}|${state.mfGold}|${state.mfSilver}|${state.fdAmount}|${state.rdAmount}|${state.epfPpfAmount}|${state.currentEmergencyFund}|${state.silverEnabled}`
+  const snapFp = `${state.zerodhaTotal}|${state.zerodhaGoldEtf}|${state.zerodhaSilverEtf}|${state.mfTotal}|${state.mfGold}|${state.mfSilver}|${state.fdAmount}|${state.rdAmount}|${state.epfPpfAmount}|${state.bondsAmount}|${state.npsAmount}|${state.currentEmergencyFund}|${state.emergencyFdAmount}|${state.emergencyRdAmount}|${state.silverEnabled}`
   if (snapFp !== snapshotFingerprint) {
     snapshotFingerprint = snapFp
     scheduleSnapshot(usePortfolioStore.getState)
