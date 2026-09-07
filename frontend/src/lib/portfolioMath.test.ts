@@ -5,9 +5,11 @@ import {
   computeCurrentAllocationPercents,
   computeEmergencyFundDelta,
   computeEmergencyFundTotal,
+  computeEquitySplit,
   computeTargetAllocationPercents,
   computeTargetEmergencyFund,
   computeTotals,
+  DIRECT_STOCK_CAP_PCT,
   type PortfolioInputs,
 } from "./portfolioMath"
 
@@ -97,20 +99,20 @@ describe("allocation percents", () => {
 })
 
 describe("emergency fund", () => {
-  it("targets 6x monthly income by default", () => {
-    expect(computeTargetEmergencyFund(100000)).toBe(600000)
+  it("targets 3x monthly income by default", () => {
+    expect(computeTargetEmergencyFund(100000)).toBe(300000)
   })
 
   it("scales the target by the chosen months", () => {
-    expect(computeTargetEmergencyFund(100000, 12)).toBe(1200000)
-    expect(computeTargetEmergencyFund(100000, 9)).toBe(900000)
+    expect(computeTargetEmergencyFund(100000, 6)).toBe(600000)
+    expect(computeTargetEmergencyFund(100000, 4)).toBe(400000)
   })
 
-  it("clamps the months multiplier to 6-12", () => {
-    expect(clampEmergencyMonths(3)).toBe(6)
-    expect(clampEmergencyMonths(20)).toBe(12)
-    expect(clampEmergencyMonths(Number.NaN)).toBe(6)
-    expect(computeTargetEmergencyFund(100000, 0)).toBe(600000)
+  it("clamps the months multiplier to 3-6", () => {
+    expect(clampEmergencyMonths(1)).toBe(3)
+    expect(clampEmergencyMonths(12)).toBe(6)
+    expect(clampEmergencyMonths(Number.NaN)).toBe(3)
+    expect(computeTargetEmergencyFund(100000, 0)).toBe(300000)
   })
 
   it("sums the liquid balance with its FDs and RDs", () => {
@@ -124,8 +126,48 @@ describe("emergency fund", () => {
   })
 
   it("delta is current minus target", () => {
-    expect(computeEmergencyFundDelta(300000, 100000)).toBe(-300000)
-    expect(computeEmergencyFundDelta(700000, 100000)).toBe(100000)
-    expect(computeEmergencyFundDelta(700000, 100000, 12)).toBe(-500000)
+    expect(computeEmergencyFundDelta(200000, 100000)).toBe(-100000)
+    expect(computeEmergencyFundDelta(400000, 100000)).toBe(100000)
+    expect(computeEmergencyFundDelta(400000, 100000, 6)).toBe(-200000)
+  })
+})
+
+describe("computeEquitySplit", () => {
+  it("splits equity into mutual funds and direct stocks", () => {
+    // Zerodha equity = 100k - 20k gold - 10k silver = 70k; MF equity = 100k
+    const s = computeEquitySplit(base)
+    expect(s.directStocks).toBe(70000)
+    expect(s.mutualFunds).toBe(100000)
+    expect(s.total).toBe(170000)
+    expect(s.directStocksPct).toBeCloseTo((70000 / 170000) * 100, 6)
+    expect(s.mutualFundsPct).toBeCloseTo((100000 / 170000) * 100, 6)
+  })
+
+  it("flags a breach and reports how much is over the cap", () => {
+    const s = computeEquitySplit(base)
+    expect(s.withinCap).toBe(false)
+    // 20% of 170k = 34k allowed, so 70k - 34k = 36k over
+    expect(s.excessAmount).toBe(36000)
+  })
+
+  it("treats a share exactly at the cap as within it", () => {
+    // Zerodha equity 20k, MF equity 80k -> exactly 20%
+    const s = computeEquitySplit({ ...base, zerodhaTotal: 50000, zerodhaGoldEtf: 20000, zerodhaSilverEtf: 10000, mfTotal: 80000 })
+    expect(s.directStocksPct).toBe(DIRECT_STOCK_CAP_PCT)
+    expect(s.withinCap).toBe(true)
+    expect(s.excessAmount).toBe(0)
+  })
+
+  it("counts silver back into direct stocks when silver is disabled", () => {
+    const s = computeEquitySplit({ ...base, silverEnabled: false })
+    expect(s.directStocks).toBe(80000)
+    expect(s.total).toBe(180000)
+  })
+
+  it("returns a zeroed, in-cap split when there is no equity", () => {
+    const s = computeEquitySplit({ ...base, zerodhaTotal: 0, zerodhaGoldEtf: 0, zerodhaSilverEtf: 0, mfTotal: 0 })
+    expect(s.total).toBe(0)
+    expect(s.directStocksPct).toBe(0)
+    expect(s.withinCap).toBe(true)
   })
 })

@@ -117,6 +117,9 @@ export const usePortfolioStore = create<PortfolioState>()((set) => ({
 
     set({
       ...loadedPortfolio,
+      // Data saved under the old 6-12x range would be rejected on the next save,
+      // so pull it into the current range on the way in.
+      emergencyMonthsTarget: clampEmergencyMonths(loadedPortfolio.emergencyMonthsTarget),
       // Older saved data has no `enabled` flag; default it on so existing
       // insurance stays visible until the user explicitly turns it off.
       lifeInsurance: { ...loadedPortfolio.lifeInsurance, enabled: loadedPortfolio.lifeInsurance.enabled ?? true },

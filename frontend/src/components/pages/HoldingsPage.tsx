@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { Banknote, Coins, LifeBuoy, LineChart, ShieldAlert, Sparkles } from "lucide-react"
+import { Banknote, Coins, LifeBuoy, LineChart, PieChart, ShieldAlert, Sparkles } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -9,12 +9,15 @@ import {
   clampEmergencyMonths,
   computeCurrentAllocationPercents,
   computeEmergencyFundTotal,
+  computeEquitySplit,
   computeTargetAllocationPercents,
   computeTargetEmergencyFund,
   computeTotals,
+  DIRECT_STOCK_CAP_PCT,
   EMERGENCY_MONTHS_MAX,
   EMERGENCY_MONTHS_MIN,
   type AllocationCategory,
+  type EquitySplit,
   type PortfolioInputs,
 } from "@/lib/portfolioMath"
 import { ASSET_COLORS, ASSET_LABELS, goalColor } from "@/lib/tokens"
@@ -143,14 +146,7 @@ export function HoldingsPage() {
   const expenseMonths = store.monthlyExpenses > 0 ? efTotal / store.monthlyExpenses : 0
 
   // Sub-allocation breakdowns per asset class (for the contribution bar inside each tile)
-  const equityFromZerodha = Math.max(
-    0,
-    store.zerodhaTotal - store.zerodhaGoldEtf - (store.silverEnabled ? store.zerodhaSilverEtf : 0),
-  )
-  const equityFromMf = Math.max(
-    0,
-    store.mfTotal - store.mfGold - (store.silverEnabled ? store.mfSilver : 0),
-  )
+  const equitySplit = computeEquitySplit(inputs)
 
   const classTiles: ClassTile[] = [
     {
@@ -160,8 +156,8 @@ export function HoldingsPage() {
       currentPct: currentPercents.equity,
       targetPct: targetPercents.equity,
       breakdown: [
-        { label: "Zerodha", amount: equityFromZerodha },
-        { label: "Mutual Funds", amount: equityFromMf },
+        { label: "Zerodha", amount: equitySplit.directStocks },
+        { label: "Mutual Funds", amount: equitySplit.mutualFunds },
       ],
     },
     {
@@ -225,6 +221,8 @@ export function HoldingsPage() {
           <ClassStatTile key={t.key} tile={t} />
         ))}
       </div>
+
+      <EquitySplitCard split={equitySplit} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <GroupCard
@@ -456,6 +454,116 @@ export function HoldingsPage() {
         </GroupCard>
       </div>
     </div>
+  )
+}
+
+// Direct stocks (Zerodha) vs mutual funds, as a share of equity only — the
+// self-picked half is meant to stay under DIRECT_STOCK_CAP_PCT.
+function EquitySplitCard({ split }: { split: EquitySplit }) {
+  const fundColor = ASSET_COLORS.equity
+  const stockColor = "#f472b6"
+  const empty = split.total <= 0
+  const statusTone = split.withinCap
+    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+    : "border-amber-500/30 bg-amber-500/10 text-amber-300"
+
+  const legs = [
+    { label: "Mutual Funds", amount: split.mutualFunds, pct: split.mutualFundsPct, color: fundColor },
+    { label: "Direct Stocks", amount: split.directStocks, pct: split.directStocksPct, color: stockColor },
+  ]
+
+  return (
+    <Card className="overflow-hidden rounded-2xl border-border/60 bg-card/85">
+      <div className="h-1" style={{ background: `linear-gradient(90deg, ${fundColor}, ${stockColor})` }} />
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div
+              className="flex size-8 items-center justify-center rounded-lg"
+              style={{ background: `${stockColor}22`, color: stockColor }}
+            >
+              <PieChart className="size-5" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Equity Split</CardTitle>
+              <div className="text-xs text-muted-foreground">
+                Direct stocks capped at {DIRECT_STOCK_CAP_PCT}% of equity
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              Direct stocks
+            </div>
+            <div className="text-2xl font-semibold leading-none" style={{ color: stockColor }}>
+              {formatPercent(split.directStocksPct)}
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 pt-0">
+        {empty ? (
+          <div className="text-[11px] text-muted-foreground/60">No equity holdings yet</div>
+        ) : (
+          <>
+            <div className="relative">
+              <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted/40">
+                {legs.map((leg) =>
+                  leg.pct > 0 ? (
+                    <div
+                      key={leg.label}
+                      className="h-full transition-[width]"
+                      style={{ width: `${leg.pct}%`, background: leg.color }}
+                      title={`${leg.label} · ${formatPercent(leg.pct)}`}
+                    />
+                  ) : null,
+                )}
+              </div>
+              {/* Cap marker: stocks sit on the right, so the line falls at 100 - cap. */}
+              <div
+                className="absolute -top-1 h-5 w-0.5 bg-foreground/70"
+                style={{ left: `${100 - DIRECT_STOCK_CAP_PCT}%` }}
+                title={`${DIRECT_STOCK_CAP_PCT}% cap`}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {legs.map((leg) => (
+                <div key={leg.label} className="rounded-xl border border-border/60 bg-muted/20 p-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="size-2.5 rounded-full" style={{ background: leg.color }} />
+                    <span className="text-xs text-muted-foreground">{leg.label}</span>
+                  </div>
+                  <div className="mt-1 text-lg font-semibold">{formatCompactINR(leg.amount)}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {formatPercent(leg.pct)} of equity
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className={`rounded-lg border px-3 py-2 text-center text-sm font-medium ${statusTone}`}>
+              {split.withinCap ? (
+                <>
+                  Within cap
+                  <span className="ml-1 font-normal text-muted-foreground">
+                    · {formatCompactINR(split.total * (DIRECT_STOCK_CAP_PCT / 100) - split.directStocks)} of
+                    headroom left
+                  </span>
+                </>
+              ) : (
+                <>
+                  Over by {formatCompactINR(split.excessAmount)}
+                  <span className="ml-1 font-normal text-muted-foreground">
+                    · shift that much into funds to get back under {DIRECT_STOCK_CAP_PCT}%
+                  </span>
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

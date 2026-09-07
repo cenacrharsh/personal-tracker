@@ -58,7 +58,7 @@ export const portfolioSchema = z.object({
   currentEmergencyFund: nonNeg.optional(),
   emergencyFdAmount: nonNeg.optional(),
   emergencyRdAmount: nonNeg.optional(),
-  emergencyMonthsTarget: z.number().int().min(6).max(12).optional(),
+  emergencyMonthsTarget: z.number().int().min(3).max(6).optional(),
   lifeInsurance: insuranceSchema.optional(),
   healthInsurance: insuranceSchema.optional(),
 })

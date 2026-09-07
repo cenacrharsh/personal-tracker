@@ -30,8 +30,8 @@ export interface PortfolioInputs {
   emergencyRdAmount: number
 }
 
-export const EMERGENCY_MONTHS_MIN = 6
-export const EMERGENCY_MONTHS_MAX = 12
+export const EMERGENCY_MONTHS_MIN = 3
+export const EMERGENCY_MONTHS_MAX = 6
 
 export interface PortfolioTotals {
   totalDebt: number
@@ -167,3 +167,57 @@ export function computeEmergencyFundDelta(
   return clampNumber(current) - computeTargetEmergencyFund(monthlyIncome, months)
 }
 
+
+// Direct stocks are the hand-picked half of equity — capped as a share of equity,
+// not of net worth, so a growing portfolio doesn't quietly loosen the limit.
+export const DIRECT_STOCK_CAP_PCT = 20
+
+export interface EquitySplit {
+  mutualFunds: number
+  directStocks: number
+  total: number
+  directStocksPct: number
+  mutualFundsPct: number
+  // Amount that would have to move out of stocks to get back under the cap.
+  excessAmount: number
+  withinCap: boolean
+}
+
+// Zerodha equity is the direct-stock pile; MF equity is the fund pile.
+export function computeEquitySplit(inputs: PortfolioInputs): EquitySplit {
+  const silverZerodha = inputs.silverEnabled ? inputs.zerodhaSilverEtf : 0
+  const silverMf = inputs.silverEnabled ? inputs.mfSilver : 0
+
+  const directStocks = clampNonNegative(
+    clampNumber(inputs.zerodhaTotal) - clampNumber(inputs.zerodhaGoldEtf) - clampNumber(silverZerodha),
+  )
+  const mutualFunds = clampNonNegative(
+    clampNumber(inputs.mfTotal) - clampNumber(inputs.mfGold) - clampNumber(silverMf),
+  )
+  const total = directStocks + mutualFunds
+
+  if (total <= 0) {
+    return {
+      mutualFunds: 0,
+      directStocks: 0,
+      total: 0,
+      directStocksPct: 0,
+      mutualFundsPct: 0,
+      excessAmount: 0,
+      withinCap: true,
+    }
+  }
+
+  const directStocksPct = (directStocks / total) * 100
+  const allowed = total * (DIRECT_STOCK_CAP_PCT / 100)
+
+  return {
+    mutualFunds,
+    directStocks,
+    total,
+    directStocksPct,
+    mutualFundsPct: (mutualFunds / total) * 100,
+    excessAmount: clampNonNegative(directStocks - allowed),
+    withinCap: directStocksPct <= DIRECT_STOCK_CAP_PCT,
+  }
+}
