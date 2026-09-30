@@ -64,7 +64,7 @@ export function SingleCardView({
           <div className="grid gap-1.5">
             <Label className="text-xs text-muted-foreground">Card</Label>
             <select
-              className="h-9 rounded-lg border border-input bg-transparent px-3 text-sm"
+              className="h-9 rounded-lg border border-input bg-transparent px-3 text-base pointer-coarse:h-12 md:pointer-fine:text-sm"
               value={card.id}
               onChange={(e) => setSelectedCardId(e.target.value)}
             >

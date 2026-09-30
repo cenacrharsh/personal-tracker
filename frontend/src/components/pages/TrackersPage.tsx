@@ -335,7 +335,7 @@ export function TrackersPage() {
                 key={p}
                 onClick={() => setActiveActivity(keysIn(p)[0])}
                 aria-pressed={active}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+                className={`relative touch-target flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm pointer-coarse:py-2.5 font-semibold transition-colors ${
                   active
                     ? p === "good"
                       ? "bg-green-500/20 text-green-400"
@@ -361,7 +361,7 @@ export function TrackersPage() {
                 key={key}
                 onClick={() => setActiveActivity(key)}
                 aria-pressed={active}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`relative touch-target flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm pointer-coarse:py-2.5 font-medium transition-colors ${
                   active ? `${def.iconBg} ${def.text}` : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -481,24 +481,26 @@ export function TrackersPage() {
               {isCurrentWeek ? formatWeekRange(weekStart) : ""}
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 pointer-coarse:gap-2">
             <button
               onClick={() => setWeekStart((ws) => addDays(ws, -7))}
-              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+              aria-label="Previous week"
+              className="relative touch-target flex size-8 pointer-coarse:size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
             >
               <ChevronLeft className="size-4" />
             </button>
             {!isCurrentWeek && (
               <button
                 onClick={() => setWeekStart(getWeekStart(new Date()))}
-                className={`rounded-lg px-2 py-1 text-xs font-medium transition-colors hover:bg-white/10 ${activeDef.text}`}
+                className={`relative touch-target rounded-lg px-2 py-1 text-xs font-medium pointer-coarse:px-3 pointer-coarse:py-2.5 transition-colors hover:bg-white/10 ${activeDef.text}`}
               >
                 Today
               </button>
             )}
             <button
               onClick={() => setWeekStart((ws) => addDays(ws, 7))}
-              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+              aria-label="Next week"
+              className="relative touch-target flex size-8 pointer-coarse:size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
             >
               <ChevronRight className="size-4" />
             </button>
@@ -573,19 +575,20 @@ export function TrackersPage() {
           <div className="text-sm font-semibold">
             {MONTH_NAMES[calMonth]} {year}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 pointer-coarse:gap-2">
             <button
               onClick={() => {
                 if (calMonth === 0) { setCalMonth(11); setYear((y) => y - 1) }
                 else setCalMonth((m) => m - 1)
               }}
-              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+              aria-label="Previous month"
+              className="relative touch-target flex size-8 pointer-coarse:size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
             >
               <ChevronLeft className="size-4" />
             </button>
             <button
               onClick={() => { setYear(now.getFullYear()); setCalMonth(now.getMonth()) }}
-              className={`rounded-lg px-2 py-1 text-xs font-medium transition-colors hover:bg-white/10 ${activeDef.text}`}
+              className={`relative touch-target rounded-lg px-2 py-1 text-xs font-medium pointer-coarse:px-3 pointer-coarse:py-2.5 transition-colors hover:bg-white/10 ${activeDef.text}`}
             >
               Today
             </button>
@@ -594,7 +597,8 @@ export function TrackersPage() {
                 if (calMonth === 11) { setCalMonth(0); setYear((y) => y + 1) }
                 else setCalMonth((m) => m + 1)
               }}
-              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+              aria-label="Next month"
+              className="relative touch-target flex size-8 pointer-coarse:size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
             >
               <ChevronRight className="size-4" />
             </button>
@@ -627,7 +631,7 @@ export function TrackersPage() {
                     key={key}
                     onClick={() => !isFuture && toggleDay(activeActivity, key)}
                     disabled={isFuture}
-                    className={`relative flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-all duration-150 sm:h-10 ${
+                    className={`relative flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-all duration-150 pointer-coarse:h-12 sm:pointer-fine:h-10 ${
                       marked
                         ? "text-foreground"
                         : isToday

@@ -49,9 +49,9 @@ export function SettingsPage() {
           <CardTitle className="text-base">Account</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-medium">{user?.name ?? "—"}</div>
-            <div className="text-xs text-muted-foreground">{user?.email ?? ""}</div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-medium">{user?.name ?? "—"}</div>
+            <div className="truncate text-xs text-muted-foreground">{user?.email ?? ""}</div>
           </div>
           <Button variant="outline" onClick={onLogout}>
             Log out

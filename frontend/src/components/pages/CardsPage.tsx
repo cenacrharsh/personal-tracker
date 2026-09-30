@@ -127,7 +127,7 @@ export function CardsPage() {
         />
       </header>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 pointer-coarse:gap-3">
         <ViewTab active={view === "overview"} onClick={() => setView("overview")} icon={<CalendarRange className="size-4" />}>
           Overview
         </ViewTab>
@@ -202,7 +202,7 @@ function ViewTab({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition ${
+      className={`relative touch-target flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition pointer-coarse:py-2.5 ${
         active
           ? "border-indigo-400/40 bg-indigo-500/15 text-foreground"
           : "border-border/60 bg-muted/20 text-muted-foreground hover:text-foreground"

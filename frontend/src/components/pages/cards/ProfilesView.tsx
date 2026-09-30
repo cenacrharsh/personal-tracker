@@ -90,7 +90,7 @@ export function ProfilesView({
           <Card key={card.id} className="overflow-hidden rounded-2xl border-border/60 bg-card/85">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <CreditCardIcon className="size-4 text-muted-foreground" />
                   <CardTitle className="text-base">{card.name}</CardTitle>
                   <span
@@ -110,7 +110,7 @@ export function ProfilesView({
                 </div>
                 <button
                   onClick={() => setCardPendingDelete(card)}
-                  className="text-muted-foreground transition hover:text-rose-300"
+                  className="relative touch-target text-muted-foreground transition hover:text-rose-300 pointer-coarse:-m-2 pointer-coarse:flex pointer-coarse:size-9 pointer-coarse:shrink-0 pointer-coarse:items-center pointer-coarse:justify-center"
                   aria-label="Delete card"
                 >
                   <Trash2 className="size-4" />
@@ -121,7 +121,7 @@ export function ProfilesView({
               <div className="grid gap-1.5">
                 <Label className="text-xs text-muted-foreground">Status</Label>
                 <select
-                  className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                  className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-base pointer-coarse:h-12 md:pointer-fine:text-sm"
                   value={card.status}
                   onChange={(e) =>
                     setCreditCardMeta(card.id, { status: e.target.value as "active" | "closed" })
@@ -134,7 +134,7 @@ export function ProfilesView({
               <div className="grid gap-1.5">
                 <Label className="text-xs text-muted-foreground">Annual fee type</Label>
                 <select
-                  className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                  className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-base pointer-coarse:h-12 md:pointer-fine:text-sm"
                   value={card.annualFeeType}
                   onChange={(e) =>
                     setCreditCardMeta(card.id, { annualFeeType: e.target.value as "ltf" | "paid" })
@@ -194,7 +194,7 @@ export function ProfilesView({
               <div className="grid gap-1.5 md:col-span-2">
                 <Label className="text-xs text-muted-foreground">Benefits / usage</Label>
                 <textarea
-                  className="min-h-16 rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                  className="min-h-16 rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none md:pointer-fine:text-sm focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
                   value={card.benefitsNote}
                   onChange={(e) => setCreditCardMeta(card.id, { benefitsNote: e.target.value })}
                   placeholder="e.g. 5% on online spends, free lounge access…"

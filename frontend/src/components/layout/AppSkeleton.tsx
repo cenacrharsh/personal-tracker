@@ -13,9 +13,9 @@ export function AppSkeleton() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="flex min-h-screen">
-        <aside className="hidden w-60 shrink-0 border-r border-border/60 px-4 py-6 md:block">
+    <div className="min-h-dvh bg-background text-foreground">
+      <div className="flex min-h-dvh">
+        <aside className="hidden w-60 shrink-0 border-r border-border/60 px-4 py-6 lg:block">
           <div className="mb-8 flex items-center gap-2 px-2">
             <Skeleton className="size-8 rounded-lg" />
             <div className="space-y-1.5">

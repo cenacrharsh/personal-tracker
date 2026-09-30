@@ -89,7 +89,7 @@ export function MetricTrend({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1.5 pointer-coarse:gap-2">
         {metricsWithData.map((m) => (
           <button
             key={m.key}
@@ -98,7 +98,7 @@ export function MetricTrend({
             onClick={() => onSelectKey(m.key)}
             onMouseEnter={() => setHoverKey(m.key)}
             onMouseLeave={() => setHoverKey(null)}
-            className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+            className={`relative touch-target rounded-full border px-2.5 py-1 text-[11px] transition-colors pointer-coarse:px-3 pointer-coarse:py-3 ${
               m.key === activeKey
                 ? "border-indigo-400/40 bg-indigo-500/15 text-indigo-200"
                 : "border-border/60 text-muted-foreground hover:text-foreground"

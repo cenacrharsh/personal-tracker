@@ -50,7 +50,7 @@ export function ReportsMatrix({
                 <button
                   type="button"
                   onClick={() => onSelectMetric(m.key)}
-                  className="text-left hover:text-foreground"
+                  className="relative touch-target text-left hover:text-foreground"
                   title={`View ${m.label} trend`}
                 >
                   <div>{m.shortLabel ?? m.label}</div>
@@ -91,7 +91,7 @@ export function ReportsMatrix({
                 )
               })}
               <TableCell>
-                <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex items-center gap-1 pointer-coarse:gap-3 transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:focus-within:opacity-100">
                   <Button
                     variant="ghost"
                     size="icon-sm"

@@ -246,7 +246,7 @@ export function OverviewPage() {
                 key={r}
                 onClick={() => setRange(r)}
                 aria-pressed={r === range}
-                className={`rounded-full px-3 py-1 text-xs transition ${
+                className={`relative touch-target rounded-full px-3 py-1 text-xs transition pointer-coarse:px-3.5 pointer-coarse:py-2.5 ${
                   r === range
                     ? "bg-indigo-500/30 text-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -280,7 +280,7 @@ export function OverviewPage() {
                   tick={AXIS_TICK}
                   axisLine={false}
                   tickLine={false}
-                  width={56}
+                  width={64}
                   tickFormatter={(v: number) => formatCompactINR(v)}
                 />
                 <Tooltip
@@ -341,13 +341,13 @@ export function OverviewPage() {
 
       <div
         className={`grid grid-cols-1 gap-3 ${
-          buckets.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"
+          buckets.length === 4 ? "xl:grid-cols-4" : "xl:grid-cols-3"
         }`}
       >
         {/* Allocation */}
         <Card
           className={`rounded-2xl border-border/60 bg-card/85 ${
-            buckets.length === 4 ? "lg:col-span-3" : "lg:col-span-2"
+            buckets.length === 4 ? "xl:col-span-3" : "xl:col-span-2"
           }`}
         >
           <CardHeader className="pb-3">

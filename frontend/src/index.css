@@ -37,6 +37,8 @@
     --color-popover: var(--popover);
     --color-card-foreground: var(--card-foreground);
     --color-card: var(--card);
+    /* Opaque match for bg-card/85 over the page, so sticky cells hide what scrolls under them. */
+    --color-card-solid: color-mix(in srgb, var(--card) 85%, var(--background));
     --color-foreground: var(--foreground);
     --color-background: var(--background);
     --radius-sm: calc(var(--radius) * 0.6);
@@ -109,4 +111,51 @@
     -moz-appearance: textfield;
     appearance: textfield;
   }
+}
+
+@layer base {
+  /* No tap flash (above), so touch presses get a state layer instead, as on Android. */
+  @media (pointer: coarse) {
+    :is(button, a[href], summary, [role="button"]):not(:disabled):active {
+      filter: brightness(1.3);
+    }
+  }
+}
+
+/* Material's 48dp minimum touch target: grows the tappable area, not the drawn
+   one. The element must be positioned (relative/absolute/fixed). */
+@utility touch-target {
+  @media (pointer: coarse) {
+    &::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max(100%, 3rem);
+      height: max(100%, 3rem);
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
+/* Toasts clear the bottom nav, which shows below lg. */
+:root {
+  --toast-offset-bottom: calc(5rem + env(safe-area-inset-bottom));
+}
+/* ...and a floating action button above the nav (Travel), which ends at 8.75rem. */
+@media (width < 64rem) {
+  :root:has([data-floating-action]) {
+    --toast-offset-bottom: calc(9.5rem + env(safe-area-inset-bottom));
+  }
+}
+@media (width >= 64rem) {
+  :root {
+    --toast-offset-bottom: 24px;
+  }
+}
+
+/* Mobile save tick: visible for a moment after each save, then gone. */
+@keyframes save-tick {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
 }

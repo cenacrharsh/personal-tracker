@@ -129,7 +129,7 @@ export function ReportDialog({
             const metrics = metricsByPanel(panel)
             return (
               <details key={panel} open={defaultOpenPanels.has(panel)} className="group rounded-xl border border-border/60 bg-muted/20">
-                <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-sm font-medium">
+                <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-sm font-medium pointer-coarse:py-3">
                   <span>{PANEL_LABELS[panel]}</span>
                   <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>

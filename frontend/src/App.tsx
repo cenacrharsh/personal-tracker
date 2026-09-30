@@ -55,7 +55,7 @@ export default function App() {
       ) : status === "anon" ? (
         <AuthPage />
       ) : loadFailed ? (
-        <div className="flex min-h-screen items-center justify-center px-6 text-center">
+        <div className="flex min-h-dvh items-center justify-center px-6 text-center">
           <div className="space-y-3">
             <p className="text-sm font-medium">Couldn't reach the server</p>
             <p className="text-xs text-muted-foreground">

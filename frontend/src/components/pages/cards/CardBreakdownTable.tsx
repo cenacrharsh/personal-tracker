@@ -66,7 +66,7 @@ export function CardBreakdownTable({
       <CardHeader className="pb-2">
         <CardTitle className="text-base">{title}</CardTitle>
         <div className="text-xs text-muted-foreground">
-          Click any cell to edit · totals on the right and bottom
+          Tap any cell to edit · totals on the right and bottom
         </div>
       </CardHeader>
       <CardContent>
@@ -74,7 +74,7 @@ export function CardBreakdownTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-left">Month</TableHead>
+                <TableHead className="max-lg:sticky max-lg:left-0 max-lg:z-10 max-lg:bg-card-solid text-left">Month</TableHead>
                 {cardsToShow.map((c) => (
                   <TableHead key={c.id} className="min-w-28 text-right">
                     {c.name}
@@ -96,7 +96,11 @@ export function CardBreakdownTable({
                         : undefined
                     }
                   >
-                    <TableCell className={`font-medium ${isCurrent ? "text-indigo-300" : ""}`}>
+                    <TableCell
+                      className={`max-lg:sticky max-lg:left-0 max-lg:z-10 max-lg:bg-card-solid font-medium ${
+                        isCurrent ? "text-indigo-300 max-lg:bg-linear-to-r max-lg:from-indigo-500/10 max-lg:to-indigo-500/10" : ""
+                      }`}
+                    >
                       {m}
                     </TableCell>
                     {cardsToShow.map((c) => (
@@ -119,7 +123,7 @@ export function CardBreakdownTable({
                 )
               })}
               <TableRow className="bg-muted/15">
-                <TableCell className="font-semibold uppercase tracking-wide text-[11px] text-muted-foreground">
+                <TableCell className="max-lg:sticky max-lg:left-0 max-lg:z-10 max-lg:bg-card-solid max-lg:bg-linear-to-r max-lg:from-muted/15 max-lg:to-muted/15 font-semibold uppercase tracking-wide text-[11px] text-muted-foreground">
                   Sum
                 </TableCell>
                 {cardTotals.map((total, i) => (

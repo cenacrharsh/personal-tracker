@@ -31,13 +31,13 @@ export function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="pointer-events-none fixed inset-0 -z-10 opacity-40">
+    <div className="min-h-dvh bg-background text-foreground">
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden opacity-40">
         <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-indigo-500/30 blur-3xl" />
         <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-emerald-500/15 blur-3xl" />
       </div>
 
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="flex min-h-dvh items-center justify-center px-4">
         <div className="w-full max-w-sm rounded-2xl border border-border/60 bg-card/70 p-6 backdrop-blur">
           <div className="mb-6 flex items-center gap-2">
             <div className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-emerald-500 text-sm font-bold text-white">

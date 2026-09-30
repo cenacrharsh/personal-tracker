@@ -5,6 +5,9 @@ export function Toaster() {
     <Sonner
       theme="dark"
       position="bottom-right"
+      // Sit above the bottom nav wherever it shows (see --toast-offset-bottom).
+      offset={{ bottom: "var(--toast-offset-bottom)" }}
+      mobileOffset={{ bottom: "var(--toast-offset-bottom)" }}
       toastOptions={{
         style: {
           background: "oklch(0.215 0.012 252)",

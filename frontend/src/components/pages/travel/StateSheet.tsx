@@ -88,7 +88,7 @@ export function StateSheet({
                       onRemoveCity(c.id)
                       setRemoved(c)
                     }}
-                    className="flex size-7 items-center justify-center rounded-full text-emerald-200/70 hover:bg-emerald-500/20 hover:text-emerald-100"
+                    className="flex size-7 items-center justify-center rounded-full text-emerald-200/70 pointer-coarse:size-9 hover:bg-emerald-500/20 hover:text-emerald-100"
                     aria-label={`Remove ${c.name}`}
                   >
                     <X className="size-3.5" />

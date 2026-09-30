@@ -428,7 +428,7 @@ export function HoldingsPage() {
                 value={efMonthsTarget}
                 onChange={(e) => store.setEmergencyMonthsTarget(Number(e.target.value))}
                 style={{ accentColor: efColor }}
-                className="flex-1 cursor-pointer"
+                className="flex-1 cursor-pointer pointer-coarse:h-12"
                 aria-label="Emergency fund target months of income"
               />
               <span className="text-[10px] text-muted-foreground">{EMERGENCY_MONTHS_MAX}×</span>
@@ -658,7 +658,7 @@ function ClassStatTile({ tile }: { tile: ClassTile }) {
     <Card className="overflow-hidden rounded-2xl border-border/60 bg-card/85">
       <div className="h-0.5" style={{ background: color }} />
       <CardContent className="space-y-3 p-4">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             <div
               className="flex size-8 items-center justify-center rounded-lg"

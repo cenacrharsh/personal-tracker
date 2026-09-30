@@ -57,7 +57,7 @@ export function TravelPage() {
 
   return (
     // Bottom room on phones so the floating add button never covers the last row.
-    <div className="space-y-4 pb-20 md:space-y-6 md:pb-0">
+    <div className="space-y-4 pb-20 md:space-y-6 lg:pb-0">
       <header className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Travel</h1>
@@ -69,7 +69,7 @@ export function TravelPage() {
                 : "Tap a state, pinch to zoom"}
           </p>
         </div>
-        <Button className="hidden md:inline-flex" disabled={!loaded} onClick={() => openAdd()}>
+        <Button className="hidden lg:inline-flex" disabled={!loaded} onClick={() => openAdd()}>
           <Plus className="size-4" />
           Add city
         </Button>
@@ -150,7 +150,8 @@ export function TravelPage() {
       {/* Phones: the add button sits in thumb reach, just above the bottom nav. */}
       <Button
         size="icon-lg"
-        className="fixed right-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 size-14 rounded-full shadow-lg shadow-black/40 md:hidden"
+        className="fixed right-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 size-14 rounded-full shadow-lg shadow-black/40 lg:hidden"
+        data-floating-action
         disabled={!loaded}
         onClick={() => openAdd()}
         aria-label="Add city"

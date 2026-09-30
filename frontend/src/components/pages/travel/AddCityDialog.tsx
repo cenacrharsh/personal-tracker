@@ -226,7 +226,7 @@ export function AddCityDialog({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search cities, e.g. Hampi"
-                className="h-11 pl-9 text-base"
+                className="h-11 pl-9 text-base pointer-coarse:h-11"
                 autoComplete="off"
                 autoCorrect="off"
                 spellCheck={false}
@@ -242,7 +242,7 @@ export function AddCityDialog({
                   <button
                     type="button"
                     onClick={() => setStateFilter(undefined)}
-                    className="flex size-6 items-center justify-center rounded-full text-muted-foreground hover:bg-background/60 hover:text-foreground"
+                    className="relative touch-target flex size-6 items-center justify-center rounded-full text-muted-foreground hover:bg-background/60 hover:text-foreground"
                     aria-label="Search all of India"
                   >
                     <X className="size-3.5" />

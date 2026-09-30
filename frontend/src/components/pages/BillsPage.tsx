@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   CalendarClock,
   CheckCircle2,
@@ -324,17 +324,28 @@ function YearGrid({
     return { card: c, paidCount }
   })
 
+  // A phone only fits a few months: bring the current one into view.
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = scrollerRef.current
+    const cell = el?.querySelector<HTMLElement>("[data-current-month]")
+    if (!el || !cell) return
+    const offset = cell.getBoundingClientRect().left - el.getBoundingClientRect().left
+    el.scrollLeft += offset - (el.clientWidth - cell.offsetWidth) / 2
+  }, [year])
+
   return (
-    <div className="overflow-x-auto">
+    <div ref={scrollerRef} className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
           <tr className="text-muted-foreground">
-            <th className="pb-2 pr-3 text-left font-normal">Card</th>
+            <th className="sticky left-0 z-10 bg-card-solid pb-2 pr-3 text-left font-normal">Card</th>
             {MONTHS.map((m, idx) => {
               const isCurrent = year === currentYear && idx + 1 === currentMonth
               return (
                 <th
                   key={m}
+                  data-current-month={isCurrent || undefined}
                   className={`px-1 pb-2 text-center font-normal ${
                     isCurrent ? "text-indigo-300" : ""
                   }`}
@@ -349,7 +360,11 @@ function YearGrid({
         <tbody>
           {monthsPerCard.map(({ card, paidCount }) => (
             <tr key={card.id} className="border-t border-border/40">
-              <td className="py-2 pr-3 align-middle text-sm font-medium">{card.name}</td>
+              <td className="sticky left-0 z-10 bg-card-solid py-2 pr-3 align-middle text-sm font-medium">
+                <span className="line-clamp-2 max-w-28 sm:max-w-none" title={card.name}>
+                  {card.name}
+                </span>
+              </td>
               {MONTHS.map((m, idx) => {
                 const month = idx + 1
                 const paid = Boolean(bills[ccBillKey(year, month, card.id)]?.paid)
@@ -359,7 +374,7 @@ function YearGrid({
                     <button
                       type="button"
                       onClick={() => onToggle(card.id, month, !paid)}
-                      className={`inline-flex size-7 items-center justify-center rounded-full transition ${
+                      className={`relative touch-target inline-flex size-7 items-center justify-center rounded-full transition pointer-coarse:size-10 ${
                         paid
                           ? "bg-emerald-500/25 text-emerald-300 hover:bg-emerald-500/40"
                           : isCurrent

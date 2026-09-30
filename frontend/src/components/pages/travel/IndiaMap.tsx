@@ -226,7 +226,7 @@ export function IndiaMap({
         </g>
       </svg>
 
-      <div className="absolute top-1 right-1 flex flex-col gap-1.5">
+      <div className="absolute top-1 right-1 flex flex-col gap-1.5 pointer-coarse:gap-2">
         <Button
           variant="secondary"
           size="icon-lg"
