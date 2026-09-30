@@ -1,7 +1,7 @@
 import { Router } from "express"
 
 import { BillPayment } from "../models/BillPayment.js"
-import { billsSchema, validate } from "../validation.js"
+import { billKeyPatterns, billPaidSchema, validate } from "../validation.js"
 
 const router = Router()
 
@@ -16,39 +16,27 @@ router.get("/", async (req, res) => {
   res.json(out)
 })
 
-// PUT replaces the user's bill payments with the posted blob.
-// Upsert-then-prune so there is never a window where the old data is gone
-// and the new data isn't written yet.
-router.put("/", validate(billsSchema), async (req, res) => {
-  const { creditCards, insurance } = req.body
+function checkKey(req, res, next) {
+  const pattern = Object.hasOwn(billKeyPatterns, req.params.kind) && billKeyPatterns[req.params.kind]
+  if (!pattern) return res.status(400).json({ error: "kind must be card or insurance" })
+  if (!pattern.test(req.params.key)) return res.status(400).json({ error: "invalid bill key" })
+  next()
+}
 
-  const cardKeys = Object.keys(creditCards)
-  const insuranceKeys = Object.keys(insurance)
+// A row exists only while the bill is paid: PUT marks it paid, DELETE unpaid.
+router.put("/:kind/:key", checkKey, validate(billPaidSchema), async (req, res) => {
+  const { kind, key } = req.params
+  await BillPayment.updateOne(
+    { userId: req.userId, kind, key },
+    { $set: { paid: true, paidAt: req.body.paidAt } },
+    { upsert: true },
+  )
+  res.json({ ok: true })
+})
 
-  const ops = []
-  for (const [key, status] of Object.entries(creditCards)) {
-    ops.push({
-      updateOne: {
-        filter: { userId: req.userId, kind: "card", key },
-        update: { $set: { paid: !!status?.paid, paidAt: status?.paidAt } },
-        upsert: true,
-      },
-    })
-  }
-  for (const [key, status] of Object.entries(insurance)) {
-    ops.push({
-      updateOne: {
-        filter: { userId: req.userId, kind: "insurance", key },
-        update: { $set: { paid: !!status?.paid, paidAt: status?.paidAt } },
-        upsert: true,
-      },
-    })
-  }
-  if (ops.length) await BillPayment.bulkWrite(ops)
-
-  await BillPayment.deleteMany({ userId: req.userId, kind: "card", key: { $nin: cardKeys } })
-  await BillPayment.deleteMany({ userId: req.userId, kind: "insurance", key: { $nin: insuranceKeys } })
-
+router.delete("/:kind/:key", checkKey, async (req, res) => {
+  const { kind, key } = req.params
+  await BillPayment.deleteOne({ userId: req.userId, kind, key })
   res.json({ ok: true })
 })
 

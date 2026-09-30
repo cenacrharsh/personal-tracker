@@ -55,6 +55,12 @@ export function CardsPage() {
 
   const cashbackRate = yearTotals.spend > 0 ? (yearTotals.cashback / yearTotals.spend) * 100 : 0
 
+  // Read on every render (not inside the memo) so a long-open app moves to the
+  // new cycle once the month changes.
+  const today = new Date()
+  const thisYear = today.getFullYear()
+  const thisMonth = today.getMonth() + 1
+
   const cardSummaries = useMemo(() => {
     return creditCards.map((card, idx) => {
       let spend = 0
@@ -64,12 +70,14 @@ export function CardsPage() {
         cashback += getMonthValue(creditCardDataByYear, year, card.id, m, "cashback")
       }
 
-      // Anchor the anniversary cycle to the one that overlaps the selected
-      // calendar year the most. For a late anniversary month (Aug–Dec) the
-      // current cycle started the previous year, so start there — otherwise a
-      // November card viewed in 2026 would point at the empty Nov 2026 cycle
-      // instead of the active Nov 2025 → Oct 2026 one.
-      const annivStartYear = card.anniversaryStartMonth >= 8 ? year - 1 : year
+      // For the current year, show the cycle that contains today — that's the
+      // one whose fee waiver is still in play. For other years, anchor to the
+      // cycle that overlaps that calendar year the most: for a late
+      // anniversary month (Aug–Dec) that cycle started the previous year.
+      const annivStartYear =
+        year === thisYear
+          ? thisMonth >= card.anniversaryStartMonth ? year : year - 1
+          : card.anniversaryStartMonth >= 8 ? year - 1 : year
       const annivRows: { month: number; year: number; expenses: number; cashback: number }[] = []
       for (let i = 0; i < 12; i += 1) {
         const base = card.anniversaryStartMonth - 1 + i
@@ -99,7 +107,7 @@ export function CardsPage() {
         annivRows,
       }
     })
-  }, [creditCards, creditCardDataByYear, year])
+  }, [creditCards, creditCardDataByYear, year, thisYear, thisMonth])
 
   return (
     <div className="space-y-6">

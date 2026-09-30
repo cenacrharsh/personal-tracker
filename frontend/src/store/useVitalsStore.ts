@@ -8,7 +8,7 @@ type VitalsState = {
   loaded: boolean
 
   hydrate: () => Promise<void>
-  saveReport: (report: VitalsReport) => Promise<void>
+  saveReport: (report: VitalsReport, previousDate?: string) => Promise<void>
   deleteReport: (date: string) => Promise<void>
 }
 
@@ -28,10 +28,17 @@ export const useVitalsStore = create<VitalsState>()((set, get) => ({
   // Explicit save (not debounced) — reports are entered a few times a year in
   // one sitting, so a submit action with clear success/failure feedback fits
   // better than the auto-save pattern used elsewhere.
-  saveReport: async (report) => {
+  // Reports are keyed by date, so editing the date moves the report: write it
+  // under the new date, then remove the one under the old date.
+  saveReport: async (report, previousDate) => {
+    // The list is updated after each step, so it matches the server even if
+    // the delete fails (saving again retries it).
     await repository.upsertVitalsReport(report)
-    const existing = get().reports.filter((r) => r.date !== report.date)
-    set({ reports: sortByDate([...existing, report]) })
+    set({ reports: sortByDate([...get().reports.filter((r) => r.date !== report.date), report]) })
+    if (previousDate && previousDate !== report.date) {
+      await repository.deleteVitalsReport(previousDate)
+      set({ reports: get().reports.filter((r) => r.date !== previousDate) })
+    }
     toast.success("Report saved")
   },
 

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { VitalsReport } from "@/data/types"
 import { VITALS_CATALOG } from "@/lib/vitalsCatalog"
+import { parseDateKey } from "@/lib/dates"
 import {
   formatMetricValue,
   formatRange,
@@ -15,7 +16,7 @@ import {
 } from "@/lib/vitals"
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr)
+  const d = parseDateKey(dateStr)
   if (Number.isNaN(d.getTime())) return dateStr
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
 }

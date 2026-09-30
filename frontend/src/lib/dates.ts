@@ -19,8 +19,15 @@ export function toDateKey(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+// `new Date("YYYY-MM-DD")` parses as UTC midnight, which reads back as the
+// previous day in timezones behind UTC. Build the date in local time instead.
+export function parseDateKey(key: string): Date {
+  const [y, m, d] = key.split("-").map(Number)
+  return new Date(y, m - 1, d)
+}
+
 export function daysUntil(dateStr: string): number {
-  const target = new Date(dateStr)
+  const target = parseDateKey(dateStr)
   if (Number.isNaN(target.getTime())) return 0
   const now = new Date()
   now.setHours(0, 0, 0, 0)

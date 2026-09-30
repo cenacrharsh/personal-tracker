@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { toast } from "sonner"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -205,7 +206,11 @@ export function SettingsPage() {
         title="Reset all data?"
         description="Erases all portfolio inputs, credit-card history, bills and snapshots from your account. This cannot be undone."
         confirmLabel="Reset everything"
-        onConfirm={() => void reset()}
+        onConfirm={() => {
+          reset().catch((e: unknown) =>
+            toast.error(`Couldn't reset data: ${e instanceof Error ? e.message : "unknown error"}`),
+          )
+        }}
       />
     </div>
   )

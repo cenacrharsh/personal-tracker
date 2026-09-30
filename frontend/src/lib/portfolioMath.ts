@@ -52,6 +52,19 @@ function clampNonNegative(n: number) {
   return n < 0 ? 0 : n
 }
 
+// Equity is each account's total minus the gold and silver held inside it.
+// Zerodha equity is the direct-stock pile; MF equity is the fund pile.
+function equityParts(inputs: PortfolioInputs) {
+  const silverZerodha = inputs.silverEnabled ? inputs.zerodhaSilverEtf : 0
+  const silverMf = inputs.silverEnabled ? inputs.mfSilver : 0
+  return {
+    fromZerodha: clampNonNegative(
+      clampNumber(inputs.zerodhaTotal) - clampNumber(inputs.zerodhaGoldEtf) - clampNumber(silverZerodha),
+    ),
+    fromMf: clampNonNegative(clampNumber(inputs.mfTotal) - clampNumber(inputs.mfGold) - clampNumber(silverMf)),
+  }
+}
+
 export function computeTotals(inputs: PortfolioInputs): PortfolioTotals {
   const silverZerodha = inputs.silverEnabled ? inputs.zerodhaSilverEtf : 0
   const silverMf = inputs.silverEnabled ? inputs.mfSilver : 0
@@ -66,13 +79,8 @@ export function computeTotals(inputs: PortfolioInputs): PortfolioTotals {
   const totalGold = clampNonNegative(clampNumber(inputs.zerodhaGoldEtf) + clampNumber(inputs.mfGold))
   const totalSilver = clampNonNegative(clampNumber(silverZerodha) + clampNumber(silverMf))
 
-  const equityFromZerodha = clampNonNegative(
-    clampNumber(inputs.zerodhaTotal) - clampNumber(inputs.zerodhaGoldEtf) - clampNumber(silverZerodha),
-  )
-  const equityFromMf = clampNonNegative(
-    clampNumber(inputs.mfTotal) - clampNumber(inputs.mfGold) - clampNumber(silverMf),
-  )
-  const totalEquity = clampNonNegative(equityFromZerodha + equityFromMf)
+  const { fromZerodha, fromMf } = equityParts(inputs)
+  const totalEquity = clampNonNegative(fromZerodha + fromMf)
 
   const totalPortfolioValue = clampNonNegative(totalEquity + totalGold + totalSilver + totalDebt)
 
@@ -183,17 +191,8 @@ export interface EquitySplit {
   withinCap: boolean
 }
 
-// Zerodha equity is the direct-stock pile; MF equity is the fund pile.
 export function computeEquitySplit(inputs: PortfolioInputs): EquitySplit {
-  const silverZerodha = inputs.silverEnabled ? inputs.zerodhaSilverEtf : 0
-  const silverMf = inputs.silverEnabled ? inputs.mfSilver : 0
-
-  const directStocks = clampNonNegative(
-    clampNumber(inputs.zerodhaTotal) - clampNumber(inputs.zerodhaGoldEtf) - clampNumber(silverZerodha),
-  )
-  const mutualFunds = clampNonNegative(
-    clampNumber(inputs.mfTotal) - clampNumber(inputs.mfGold) - clampNumber(silverMf),
-  )
+  const { fromZerodha: directStocks, fromMf: mutualFunds } = equityParts(inputs)
   const total = directStocks + mutualFunds
 
   if (total <= 0) {

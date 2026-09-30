@@ -4,23 +4,21 @@ import {
   DEFAULT_BILLS,
   DEFAULT_PORTFOLIO,
   repository,
+  type BillKind,
   type BillsData,
   type CreditCardConfig,
-  type CreditCardsData,
   type CreditCardYearData,
   type InsuranceDetails,
   type PortfolioData,
+  type PortfolioPatch,
   type Snapshot,
 } from "@/data"
-import {
-  clampEmergencyMonths,
-  computeEmergencyFundTotal,
-  computeTotals,
-  type PortfolioInputs,
-} from "@/lib/portfolioMath"
+import { clampEmergencyMonths, computeEmergencyFundTotal, computeTotals } from "@/lib/portfolioMath"
 import { clampNonNeg } from "@/lib/money"
 import { todayKey } from "@/lib/dates"
-import { trackSave } from "@/store/useSyncStore"
+import { debounceSave, discardFailedSaves, flushSaves, trackSave } from "@/store/useSyncStore"
+import { useTrackersStore } from "@/store/useTrackersStore"
+import { useVitalsStore } from "@/store/useVitalsStore"
 
 export type {
   CreditCardConfig,
@@ -93,262 +91,329 @@ export type PortfolioState = PortfolioData & {
   hydrate: () => Promise<void>
 }
 
+function mergeInsurance(current: InsuranceDetails, details: Partial<InsuranceDetails>): InsuranceDetails {
+  return {
+    ...current,
+    ...details,
+    coverAmount: typeof details.coverAmount === "number" ? clampNonNeg(details.coverAmount) : current.coverAmount,
+    premium: typeof details.premium === "number" ? clampNonNeg(details.premium) : current.premium,
+  }
+}
+
 export const ccBillKey = (year: number, month: number, cardId: string) => `${year}-${month}-${cardId}`
 export const insuranceBillKey = (year: number, type: "life" | "health") => `${year}-${type}`
 
-export const usePortfolioStore = create<PortfolioState>()((set) => ({
-  ...DEFAULT_PORTFOLIO,
-  creditCards: [],
-  creditCardDataByYear: {},
-  loaded: false,
-  snapshots: [],
-  bills: DEFAULT_BILLS,
+type InsuranceField = "lifeInsurance" | "healthInsurance"
+type ScalarField = Exclude<keyof PortfolioData, InsuranceField>
+type CardSettings = Omit<CreditCardConfig, "id">
 
-  hydrate: async () => {
-    const [portfolio, cards, snapshots, bills] = await Promise.all([
-      repository.getPortfolio(),
-      repository.getCreditCards(),
-      repository.listSnapshots(),
-      repository.getBills(),
-    ])
+// Portfolio fields edited since the last save: "fdAmount", "lifeInsurance.premium", ...
+const dirtyPortfolio = new Set<string>()
+// Card settings edited since the last save, per card id.
+const dirtyCards = new Map<string, Set<keyof CardSettings>>()
+// Inputs to today's net-worth snapshot; editing anything else doesn't touch it.
+const NET_WORTH_FIELDS = new Set<string>([
+  "silverEnabled", "zerodhaTotal", "zerodhaGoldEtf", "zerodhaSilverEtf", "mfTotal", "mfGold", "mfSilver",
+  "fdAmount", "rdAmount", "epfPpfAmount", "bondsAmount", "npsAmount",
+  "currentEmergencyFund", "emergencyFdAmount", "emergencyRdAmount",
+])
+// A card's create, settings, month and delete requests share one queue, so
+// they reach the server in order (no edit can arrive before the card exists).
+const cardQueue = (cardId: string) => `card:${cardId}`
 
-    // Spread over the defaults so data saved before a field existed still hydrates.
-    const loadedPortfolio = { ...DEFAULT_PORTFOLIO, ...(portfolio ?? {}) }
+export const usePortfolioStore = create<PortfolioState>()((set, get) => {
+  // Upserts today's net-worth point and keeps the local list in step. Queued
+  // like any other save, so points arrive in order and reset waits for them.
+  const saveSnapshot = async () => {
+    const snap = snapshotFromState(get())
+    if (snap.netWorth <= 0 && snap.emergencyFund <= 0) return
+    await repository.upsertSnapshot(snap)
+    set((s) => ({ snapshots: [...s.snapshots.filter((x) => x.date !== snap.date), snap] }))
+  }
 
-    set({
-      ...loadedPortfolio,
-      // Data saved under the old 6-12x range would be rejected on the next save,
-      // so pull it into the current range on the way in.
-      emergencyMonthsTarget: clampEmergencyMonths(loadedPortfolio.emergencyMonthsTarget),
-      // Older saved data has no `enabled` flag; default it on so existing
-      // insurance stays visible until the user explicitly turns it off.
-      lifeInsurance: { ...loadedPortfolio.lifeInsurance, enabled: loadedPortfolio.lifeInsurance.enabled ?? true },
-      healthInsurance: { ...loadedPortfolio.healthInsurance, enabled: loadedPortfolio.healthInsurance.enabled ?? true },
-      creditCards: cards?.creditCards ?? [],
-      creditCardDataByYear: cards?.creditCardDataByYear ?? {},
-      snapshots,
-      bills: bills ?? DEFAULT_BILLS,
-      loaded: true,
+  // Sends only the changed portfolio fields, with their values at send time.
+  const queuePortfolioSave = (paths: string[]) => {
+    for (const p of paths) dirtyPortfolio.add(p)
+    debounceSave("portfolio", async () => {
+      const paths = [...dirtyPortfolio]
+      if (paths.length === 0) return // already sent by a retry
+      dirtyPortfolio.clear()
+      const s = get()
+      const patch: Record<string, unknown> = {}
+      for (const path of paths) {
+        const [field, sub] = path.split(".") as [keyof PortfolioData, keyof InsuranceDetails | undefined]
+        if (sub) {
+          const current = s[field as InsuranceField]
+          patch[field] = { ...(patch[field] as object), [sub]: current[sub] }
+        } else {
+          patch[field] = s[field]
+        }
+      }
+      try {
+        await repository.updatePortfolio(patch as PortfolioPatch)
+      } catch (e) {
+        for (const p of paths) dirtyPortfolio.add(p) // resent on retry
+        throw e
+      }
+      if (paths.some((p) => NET_WORTH_FIELDS.has(p))) trackSave("snapshot", saveSnapshot)
     })
-  },
+  }
 
-  setAge: (age) => set({ age: clampNonNeg(age) }),
-  setMonthlyIncome: (monthlyIncome) => set({ monthlyIncome: clampNonNeg(monthlyIncome) }),
-  setMonthlyExpenses: (v) => set({ monthlyExpenses: clampNonNeg(v) }),
-  setSilverEnabled: (enabled) =>
-    set(() =>
-      enabled
-        ? { silverEnabled: true }
-        : { silverEnabled: false, zerodhaSilverEtf: 0, mfSilver: 0 },
-    ),
+  const setField = <K extends ScalarField>(field: K, value: PortfolioData[K]) => {
+    set({ [field]: value } as Partial<PortfolioState>)
+    queuePortfolioSave([field])
+  }
 
-  setZerodhaTotal: (v) => set({ zerodhaTotal: clampNonNeg(v) }),
-  setZerodhaGoldEtf: (v) => set({ zerodhaGoldEtf: clampNonNeg(v) }),
-  setZerodhaSilverEtf: (v) =>
-    set((s) => ({ zerodhaSilverEtf: s.silverEnabled ? clampNonNeg(v) : 0 })),
+  const setInsurance = (field: InsuranceField, details: Partial<InsuranceDetails>) => {
+    set((s) => ({ [field]: mergeInsurance(s[field], details) }))
+    queuePortfolioSave(Object.keys(details).map((k) => `${field}.${k}`))
+  }
 
-  setMfTotal: (v) => set({ mfTotal: clampNonNeg(v) }),
-  setMfGold: (v) => set({ mfGold: clampNonNeg(v) }),
-  setMfSilver: (v) =>
-    set((s) => ({ mfSilver: s.silverEnabled ? clampNonNeg(v) : 0 })),
+  const saveBill = (kind: BillKind, key: string, paid: boolean, paidAt: number) =>
+    trackSave(`bill:${kind}:${key}`, () =>
+      paid ? repository.markBillPaid(kind, key, paidAt) : repository.markBillUnpaid(kind, key),
+    )
 
-  setFdAmount: (v) => set({ fdAmount: clampNonNeg(v) }),
-  setRdAmount: (v) => set({ rdAmount: clampNonNeg(v) }),
-  setEpfPpfAmount: (v) => set({ epfPpfAmount: clampNonNeg(v) }),
-  setBondsAmount: (v) => set({ bondsAmount: clampNonNeg(v) }),
-  setNpsAmount: (v) => set({ npsAmount: clampNonNeg(v) }),
+  const cardExists = (cardId: string) => get().creditCards.some((c) => c.id === cardId)
 
-  setCurrentEmergencyFund: (v) => set({ currentEmergencyFund: clampNonNeg(v) }),
-  setEmergencyFdAmount: (v) => set({ emergencyFdAmount: clampNonNeg(v) }),
-  setEmergencyRdAmount: (v) => set({ emergencyRdAmount: clampNonNeg(v) }),
-  setEmergencyMonthsTarget: (v) => set({ emergencyMonthsTarget: clampEmergencyMonths(v) }),
+  return {
+    // Placeholders until hydrate() loads the real data; the app shows a
+    // skeleton until `loaded` is true.
+    ...DEFAULT_PORTFOLIO,
+    creditCards: [],
+    creditCardDataByYear: {},
+    loaded: false,
+    snapshots: [],
+    bills: DEFAULT_BILLS,
 
-  setLifeInsurance: (details) =>
-    set((s) => ({
-      lifeInsurance: {
-        ...s.lifeInsurance,
-        ...details,
-        coverAmount:
-          typeof details.coverAmount === "number" ? clampNonNeg(details.coverAmount) : s.lifeInsurance.coverAmount,
-        premium:
-          typeof details.premium === "number" ? clampNonNeg(details.premium) : s.lifeInsurance.premium,
-      },
-    })),
-  setHealthInsurance: (details) =>
-    set((s) => ({
-      healthInsurance: {
-        ...s.healthInsurance,
-        ...details,
-        coverAmount:
-          typeof details.coverAmount === "number" ? clampNonNeg(details.coverAmount) : s.healthInsurance.coverAmount,
-        premium:
-          typeof details.premium === "number" ? clampNonNeg(details.premium) : s.healthInsurance.premium,
-      },
-    })),
+    hydrate: async () => {
+      const [portfolio, cards, snapshots, bills] = await Promise.all([
+        repository.getPortfolio(),
+        repository.getCreditCards(),
+        repository.listSnapshots(),
+        repository.getBills(),
+      ])
+      set({
+        ...portfolio,
+        creditCards: cards.creditCards,
+        creditCardDataByYear: cards.creditCardDataByYear,
+        snapshots,
+        bills,
+        loaded: true,
+      })
+      // One net-worth point per day the app is opened.
+      trackSave("snapshot", saveSnapshot)
+    },
 
-  setCreditCardMonthValue: ({ year, cardId, month, field, value }) =>
-    set((s) => {
+    setAge: (age) => setField("age", clampNonNeg(age)),
+    setMonthlyIncome: (v) => setField("monthlyIncome", clampNonNeg(v)),
+    setMonthlyExpenses: (v) => setField("monthlyExpenses", clampNonNeg(v)),
+    setSilverEnabled: (enabled) => {
+      set(enabled ? { silverEnabled: true } : { silverEnabled: false, zerodhaSilverEtf: 0, mfSilver: 0 })
+      queuePortfolioSave(enabled ? ["silverEnabled"] : ["silverEnabled", "zerodhaSilverEtf", "mfSilver"])
+    },
+
+    setZerodhaTotal: (v) => setField("zerodhaTotal", clampNonNeg(v)),
+    setZerodhaGoldEtf: (v) => setField("zerodhaGoldEtf", clampNonNeg(v)),
+    setZerodhaSilverEtf: (v) => setField("zerodhaSilverEtf", get().silverEnabled ? clampNonNeg(v) : 0),
+
+    setMfTotal: (v) => setField("mfTotal", clampNonNeg(v)),
+    setMfGold: (v) => setField("mfGold", clampNonNeg(v)),
+    setMfSilver: (v) => setField("mfSilver", get().silverEnabled ? clampNonNeg(v) : 0),
+
+    setFdAmount: (v) => setField("fdAmount", clampNonNeg(v)),
+    setRdAmount: (v) => setField("rdAmount", clampNonNeg(v)),
+    setEpfPpfAmount: (v) => setField("epfPpfAmount", clampNonNeg(v)),
+    setBondsAmount: (v) => setField("bondsAmount", clampNonNeg(v)),
+    setNpsAmount: (v) => setField("npsAmount", clampNonNeg(v)),
+
+    setCurrentEmergencyFund: (v) => setField("currentEmergencyFund", clampNonNeg(v)),
+    setEmergencyFdAmount: (v) => setField("emergencyFdAmount", clampNonNeg(v)),
+    setEmergencyRdAmount: (v) => setField("emergencyRdAmount", clampNonNeg(v)),
+    setEmergencyMonthsTarget: (v) => setField("emergencyMonthsTarget", clampEmergencyMonths(v)),
+
+    setLifeInsurance: (details) => setInsurance("lifeInsurance", details),
+    setHealthInsurance: (details) => setInsurance("healthInsurance", details),
+
+    setCreditCardMonthValue: ({ year, cardId, month, field, value }) => {
       const safeYear = Math.round(Number.isFinite(year) ? year : new Date().getFullYear())
       const safeMonth = clampMonth(month)
-      const safeValue = clampNonNeg(value)
-      const yearData = s.creditCardDataByYear[safeYear] ?? {}
-      const cardData =
-        yearData[cardId] ?? { cashback: emptyMonthMap(), expenses: emptyMonthMap() }
-      return {
-        creditCardDataByYear: {
-          ...s.creditCardDataByYear,
-          [safeYear]: {
-            ...yearData,
-            [cardId]: {
-              ...cardData,
-              [field]: { ...cardData[field], [safeMonth]: safeValue },
+      set((s) => {
+        const yearData = s.creditCardDataByYear[safeYear] ?? {}
+        const cardData =
+          yearData[cardId] ?? { cashback: emptyMonthMap(), expenses: emptyMonthMap() }
+        return {
+          creditCardDataByYear: {
+            ...s.creditCardDataByYear,
+            [safeYear]: {
+              ...yearData,
+              [cardId]: {
+                ...cardData,
+                [field]: { ...cardData[field], [safeMonth]: clampNonNeg(value) },
+              },
             },
           },
+        }
+      })
+      debounceSave(
+        `card:${cardId}:month:${safeYear}:${safeMonth}:${field}`,
+        async () => {
+          if (!cardExists(cardId)) return // removed meanwhile
+          const latest = get().creditCardDataByYear[safeYear]?.[cardId]?.[field]?.[safeMonth] ?? 0
+          await repository.setCardMonthValue(cardId, { year: safeYear, month: safeMonth, field, value: latest })
         },
-      }
-    }),
+        cardQueue(cardId),
+      )
+    },
 
-  setCreditCardMeta: (cardId, details) =>
-    set((s) => ({
-      creditCards: s.creditCards.map((card) => {
-        if (card.id !== cardId) return card
-        return {
-          ...card,
-          ...details,
-          anniversaryStartMonth:
-            typeof details.anniversaryStartMonth === "number"
-              ? clampMonth(details.anniversaryStartMonth)
-              : card.anniversaryStartMonth,
-          feeWaiverTarget:
-            typeof details.feeWaiverTarget === "number"
-              ? clampNonNeg(details.feeWaiverTarget)
-              : card.feeWaiverTarget,
-          status: details.status === "active" || details.status === "closed" ? details.status : card.status,
-          annualFeeType:
-            details.annualFeeType === "ltf" || details.annualFeeType === "paid"
-              ? details.annualFeeType
-              : card.annualFeeType,
-          annualFeeAmount:
-            typeof details.annualFeeAmount === "number"
-              ? clampNonNeg(details.annualFeeAmount)
-              : card.annualFeeAmount,
-          creditLimit:
-            typeof details.creditLimit === "number" ? clampNonNeg(details.creditLimit) : card.creditLimit,
-          benefitsNote: typeof details.benefitsNote === "string" ? details.benefitsNote : card.benefitsNote,
-        }
-      }),
-    })),
+    setCreditCardMeta: (cardId, details) => {
+      set((s) => ({
+        creditCards: s.creditCards.map((card) => {
+          if (card.id !== cardId) return card
+          return {
+            ...card,
+            ...details,
+            anniversaryStartMonth:
+              typeof details.anniversaryStartMonth === "number"
+                ? clampMonth(details.anniversaryStartMonth)
+                : card.anniversaryStartMonth,
+            feeWaiverTarget:
+              typeof details.feeWaiverTarget === "number"
+                ? clampNonNeg(details.feeWaiverTarget)
+                : card.feeWaiverTarget,
+            status: details.status === "active" || details.status === "closed" ? details.status : card.status,
+            annualFeeType:
+              details.annualFeeType === "ltf" || details.annualFeeType === "paid"
+                ? details.annualFeeType
+                : card.annualFeeType,
+            annualFeeAmount:
+              typeof details.annualFeeAmount === "number"
+                ? clampNonNeg(details.annualFeeAmount)
+                : card.annualFeeAmount,
+            creditLimit:
+              typeof details.creditLimit === "number" ? clampNonNeg(details.creditLimit) : card.creditLimit,
+            benefitsNote: typeof details.benefitsNote === "string" ? details.benefitsNote : card.benefitsNote,
+          }
+        }),
+      }))
+      const fields = dirtyCards.get(cardId) ?? new Set()
+      for (const k of Object.keys(details)) fields.add(k as keyof CardSettings)
+      dirtyCards.set(cardId, fields)
+      debounceSave(
+        `card:${cardId}:settings`,
+        async () => {
+          const changed = dirtyCards.get(cardId)
+          const card = get().creditCards.find((c) => c.id === cardId)
+          if (!changed || !card) return // already sent by a retry, or removed meanwhile
+          dirtyCards.delete(cardId)
+          const patch: Partial<CardSettings> = {}
+          for (const f of changed) Object.assign(patch, { [f]: card[f] })
+          try {
+            await repository.updateCard(cardId, patch)
+          } catch (e) {
+            // Resent on retry, merged with anything edited since.
+            const now = dirtyCards.get(cardId) ?? new Set()
+            for (const f of changed) now.add(f)
+            dirtyCards.set(cardId, now)
+            throw e
+          }
+        },
+        cardQueue(cardId),
+      )
+    },
 
-  addCreditCard: (name) =>
-    set((s) => {
+    addCreditCard: (name) => {
       const trimmed = name.trim()
-      if (!trimmed) return {}
+      if (!trimmed) return
       const baseId = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
-      const id = `${baseId || "card"}-${Date.now().toString(36)}`
-      return {
-        creditCards: [
-          ...s.creditCards,
-          {
-            id,
-            name: trimmed,
-            anniversaryStartMonth: 1,
-            feeWaiverTarget: 0,
-            status: "active",
-            annualFeeType: "ltf",
-            annualFeeAmount: 0,
-            creditLimit: 0,
-            benefitsNote: "",
-          },
-        ],
+      const card: CreditCardConfig = {
+        id: `${baseId || "card"}-${Date.now().toString(36)}`,
+        name: trimmed,
+        anniversaryStartMonth: 1,
+        feeWaiverTarget: 0,
+        status: "active",
+        annualFeeType: "ltf",
+        annualFeeAmount: 0,
+        creditLimit: 0,
+        benefitsNote: "",
       }
-    }),
+      set((s) => ({ creditCards: [...s.creditCards, card] }))
+      trackSave(
+        `card:${card.id}:create`,
+        async () => {
+          if (cardExists(card.id)) await repository.createCard(card) // skip if removed before a retry
+        },
+        cardQueue(card.id),
+      )
+    },
 
-  removeCreditCard: (cardId) =>
-    set((s) => {
-      const nextCards = s.creditCards.filter((c) => c.id !== cardId)
-      const nextByYear: Record<number, CreditCardYearData> = {}
-      for (const [yk, yv] of Object.entries(s.creditCardDataByYear)) {
-        const next: CreditCardYearData = {}
-        for (const [cid, entry] of Object.entries(yv)) {
-          if (cid !== cardId) next[cid] = entry
+    removeCreditCard: (cardId) => {
+      set((s) => {
+        const nextByYear: Record<number, CreditCardYearData> = {}
+        for (const [yk, yv] of Object.entries(s.creditCardDataByYear)) {
+          const next: CreditCardYearData = {}
+          for (const [cid, entry] of Object.entries(yv)) {
+            if (cid !== cardId) next[cid] = entry
+          }
+          nextByYear[Number(yk)] = next
         }
-        nextByYear[Number(yk)] = next
-      }
-      return { creditCards: nextCards, creditCardDataByYear: nextByYear }
-    }),
+        return { creditCards: s.creditCards.filter((c) => c.id !== cardId), creditCardDataByYear: nextByYear }
+      })
+      dirtyCards.delete(cardId)
+      trackSave(`card:${cardId}:delete`, () => repository.deleteCard(cardId), cardQueue(cardId))
+    },
 
-  setCreditCardBillPaid: ({ year, month, cardId, paid }) =>
-    set((s) => {
+    setCreditCardBillPaid: ({ year, month, cardId, paid }) => {
       const key = ccBillKey(year, clampMonth(month), cardId)
-      const next = { ...s.bills.creditCards }
-      if (paid) {
-        next[key] = { paid: true, paidAt: Date.now() }
-      } else {
-        delete next[key]
-      }
-      return { bills: { ...s.bills, creditCards: next } }
-    }),
+      const paidAt = Date.now()
+      set((s) => {
+        const next = { ...s.bills.creditCards }
+        if (paid) next[key] = { paid: true, paidAt }
+        else delete next[key]
+        return { bills: { ...s.bills, creditCards: next } }
+      })
+      saveBill("card", key, paid, paidAt)
+    },
 
-  setInsuranceBillPaid: ({ year, type, paid }) =>
-    set((s) => {
+    setInsuranceBillPaid: ({ year, type, paid }) => {
       const key = insuranceBillKey(year, type)
-      const next = { ...s.bills.insurance }
-      if (paid) {
-        next[key] = { paid: true, paidAt: Date.now() }
-      } else {
-        delete next[key]
-      }
-      return { bills: { ...s.bills, insurance: next } }
-    }),
+      const paidAt = Date.now()
+      set((s) => {
+        const next = { ...s.bills.insurance }
+        if (paid) next[key] = { paid: true, paidAt }
+        else delete next[key]
+        return { bills: { ...s.bills, insurance: next } }
+      })
+      saveBill("insurance", key, paid, paidAt)
+    },
 
-  reset: async () => {
-    await repository.reset()
-    set({
-      ...DEFAULT_PORTFOLIO,
-      creditCards: [],
-      creditCardDataByYear: {},
-      snapshots: [],
-      bills: DEFAULT_BILLS,
-    })
-  },
-}))
-
-function pickPortfolio(s: PortfolioState): PortfolioData {
-  return {
-    age: s.age,
-    monthlyIncome: s.monthlyIncome,
-    monthlyExpenses: s.monthlyExpenses,
-    silverEnabled: s.silverEnabled,
-    zerodhaTotal: s.zerodhaTotal,
-    zerodhaGoldEtf: s.zerodhaGoldEtf,
-    zerodhaSilverEtf: s.zerodhaSilverEtf,
-    mfTotal: s.mfTotal,
-    mfGold: s.mfGold,
-    mfSilver: s.mfSilver,
-    fdAmount: s.fdAmount,
-    rdAmount: s.rdAmount,
-    epfPpfAmount: s.epfPpfAmount,
-    bondsAmount: s.bondsAmount,
-    npsAmount: s.npsAmount,
-    currentEmergencyFund: s.currentEmergencyFund,
-    emergencyFdAmount: s.emergencyFdAmount,
-    emergencyRdAmount: s.emergencyRdAmount,
-    emergencyMonthsTarget: s.emergencyMonthsTarget,
-    lifeInsurance: s.lifeInsurance,
-    healthInsurance: s.healthInsurance,
+    reset: async () => {
+      // Let every edit finish saving first: nothing can land after the wipe,
+      // and if the reset fails no edit has been lost.
+      await flushSaves()
+      await repository.reset()
+      // Wiped on the server, so failed saves and unsent fields are moot.
+      discardFailedSaves()
+      dirtyPortfolio.clear()
+      dirtyCards.clear()
+      set({
+        ...DEFAULT_PORTFOLIO,
+        creditCards: [],
+        creditCardDataByYear: {},
+        snapshots: [],
+        bills: DEFAULT_BILLS,
+      })
+      // Trackers refetch on next visit.
+      useTrackersStore.setState({ trackers: {}, loaded: false })
+      useVitalsStore.setState({ reports: [] })
+      // Then load the server's defaults; the screen is already cleared if this fails.
+      await get().hydrate().catch(() => {})
+    },
   }
-}
-
-function pickCards(s: PortfolioState): CreditCardsData {
-  return {
-    creditCards: s.creditCards,
-    creditCardDataByYear: s.creditCardDataByYear,
-  }
-}
+})
 
 function snapshotFromState(s: PortfolioState): Snapshot {
-  const inputs: PortfolioInputs = pickPortfolio(s)
-  const totals = computeTotals(inputs)
+  const totals = computeTotals(s)
   return {
     date: todayKey(),
     ts: Date.now(),
@@ -360,103 +425,3 @@ function snapshotFromState(s: PortfolioState): Snapshot {
     emergencyFund: computeEmergencyFundTotal(s),
   }
 }
-
-let portfolioSaveTimer: ReturnType<typeof setTimeout> | null = null
-let cardsSaveTimer: ReturnType<typeof setTimeout> | null = null
-let billsSaveTimer: ReturnType<typeof setTimeout> | null = null
-let snapshotTimer: ReturnType<typeof setTimeout> | null = null
-
-function schedulePortfolioSave(getState: () => PortfolioState) {
-  if (portfolioSaveTimer) clearTimeout(portfolioSaveTimer)
-  portfolioSaveTimer = setTimeout(() => {
-    const s = getState()
-    if (!s.loaded) return
-    trackSave(
-      () => repository.savePortfolio(pickPortfolio(s)),
-      () => {
-        portfolioFingerprint = ""
-      },
-    )
-  }, 400)
-}
-
-function scheduleCardsSave(getState: () => PortfolioState) {
-  if (cardsSaveTimer) clearTimeout(cardsSaveTimer)
-  cardsSaveTimer = setTimeout(() => {
-    const s = getState()
-    if (!s.loaded) return
-    trackSave(
-      () => repository.saveCreditCards(pickCards(s)),
-      () => {
-        cardsFingerprint = ""
-      },
-    )
-  }, 400)
-}
-
-function scheduleBillsSave(getState: () => PortfolioState) {
-  if (billsSaveTimer) clearTimeout(billsSaveTimer)
-  billsSaveTimer = setTimeout(() => {
-    const s = getState()
-    if (!s.loaded) return
-    trackSave(
-      () => repository.saveBills(s.bills),
-      () => {
-        billsFingerprint = ""
-      },
-    )
-  }, 200)
-}
-
-function scheduleSnapshot(getState: () => PortfolioState) {
-  if (snapshotTimer) clearTimeout(snapshotTimer)
-  snapshotTimer = setTimeout(() => {
-    const s = getState()
-    if (!s.loaded) return
-    const snap = snapshotFromState(s)
-    if (snap.netWorth <= 0 && snap.emergencyFund <= 0) return
-    trackSave(
-      async () => {
-        await repository.upsertSnapshot(snap)
-        const next = await repository.listSnapshots()
-        usePortfolioStore.setState({ snapshots: next })
-      },
-      () => {
-        snapshotFingerprint = ""
-      },
-    )
-  }, 1500)
-}
-
-let portfolioFingerprint = ""
-let cardsFingerprint = ""
-let billsFingerprint = ""
-let snapshotFingerprint = ""
-
-usePortfolioStore.subscribe((state) => {
-  if (!state.loaded) return
-
-  const portfolioFp = JSON.stringify(pickPortfolio(state))
-  if (portfolioFp !== portfolioFingerprint) {
-    portfolioFingerprint = portfolioFp
-    schedulePortfolioSave(usePortfolioStore.getState)
-  }
-
-  const cardsFp = JSON.stringify(pickCards(state))
-  if (cardsFp !== cardsFingerprint) {
-    cardsFingerprint = cardsFp
-    scheduleCardsSave(usePortfolioStore.getState)
-  }
-
-  const billsFp = JSON.stringify(state.bills)
-  if (billsFp !== billsFingerprint) {
-    billsFingerprint = billsFp
-    scheduleBillsSave(usePortfolioStore.getState)
-  }
-
-  const snapFp = `${state.zerodhaTotal}|${state.zerodhaGoldEtf}|${state.zerodhaSilverEtf}|${state.mfTotal}|${state.mfGold}|${state.mfSilver}|${state.fdAmount}|${state.rdAmount}|${state.epfPpfAmount}|${state.bondsAmount}|${state.npsAmount}|${state.currentEmergencyFund}|${state.emergencyFdAmount}|${state.emergencyRdAmount}|${state.silverEnabled}`
-  if (snapFp !== snapshotFingerprint) {
-    snapshotFingerprint = snapFp
-    scheduleSnapshot(usePortfolioStore.getState)
-  }
-})

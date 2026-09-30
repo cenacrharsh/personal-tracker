@@ -1,17 +1,10 @@
 import { Router } from "express"
 
 import { VitalsReport } from "../models/VitalsReport.js"
-import { validate, vitalsDateParam, vitalsPutSchema } from "../validation.js"
+import { checkDateParam, validate, vitalsPutSchema } from "../validation.js"
+import { mapToObj } from "../utils.js"
 
 const router = Router()
-
-// Mongoose Map fields are Map instances; JSON.stringify would turn them into {}.
-const mapToObj = (m) => {
-  if (!m) return {}
-  if (m instanceof Map) return Object.fromEntries(m)
-  if (typeof m.toObject === "function") return m.toObject()
-  return m
-}
 
 function toClient(doc) {
   return { date: doc.date, lab: doc.lab, notes: doc.notes, results: mapToObj(doc.results) }
@@ -24,10 +17,7 @@ router.get("/", async (req, res) => {
 })
 
 // PUT upserts a report by (userId, date) — atomic, no delete window.
-router.put("/:date", (req, res, next) => {
-  if (!vitalsDateParam.test(req.params.date)) return res.status(400).json({ error: "date must be YYYY-MM-DD" })
-  next()
-}, validate(vitalsPutSchema), async (req, res) => {
+router.put("/:date", checkDateParam, validate(vitalsPutSchema), async (req, res) => {
   const { lab = "", notes = "", results } = req.body
   const doc = await VitalsReport.findOneAndUpdate(
     { userId: req.userId, date: req.params.date },
@@ -37,10 +27,10 @@ router.put("/:date", (req, res, next) => {
   res.json(toClient(doc))
 })
 
-// DELETE a report by date; 404 if nothing matched.
+// DELETE a report by date. Safe to repeat: deleting a report that's already
+// gone succeeds, so a retry after a lost response doesn't get stuck.
 router.delete("/:date", async (req, res) => {
-  const result = await VitalsReport.deleteOne({ userId: req.userId, date: req.params.date })
-  if (result.deletedCount === 0) return res.status(404).json({ error: "Report not found" })
+  await VitalsReport.deleteOne({ userId: req.userId, date: req.params.date })
   res.json({ ok: true })
 })
 

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { HeartPulse, Plus } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,6 +10,7 @@ import { ConfirmDialog } from "@/components/primitives/ConfirmDialog"
 import { useVitalsStore } from "@/store/useVitalsStore"
 import type { VitalMetricDef, VitalsReport } from "@/data/types"
 import { VITALS_CATALOG } from "@/lib/vitalsCatalog"
+import { parseDateKey } from "@/lib/dates"
 import {
   formatMetricValue,
   formatRange,
@@ -23,7 +25,7 @@ import { ReportsMatrix } from "@/components/pages/vitals/ReportsMatrix"
 import { MetricTrend } from "@/components/pages/vitals/MetricTrend"
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr)
+  const d = parseDateKey(dateStr)
   if (Number.isNaN(d.getTime())) return dateStr
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
 }
@@ -31,7 +33,7 @@ function formatDate(dateStr: string): string {
 const STATUS_RANK: Record<MetricStatus, number> = { low: 0, high: 0, borderline: 1, ok: 2 }
 
 function formatMonthYear(dateStr: string): string {
-  const d = new Date(dateStr)
+  const d = parseDateKey(dateStr)
   if (Number.isNaN(d.getTime())) return dateStr
   return d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" })
 }
@@ -207,7 +209,7 @@ export function VitalsPage() {
           onOpenChange={setDialogOpen}
           report={editingReport}
           existingDates={reports.map((r) => r.date)}
-          onSave={saveReport}
+          onSave={(report) => saveReport(report, editingReport?.date)}
         />
       ) : null}
 
@@ -223,7 +225,11 @@ export function VitalsPage() {
             : ""
         }
         onConfirm={() => {
-          if (reportPendingDelete) void deleteReport(reportPendingDelete.date)
+          if (reportPendingDelete) {
+            deleteReport(reportPendingDelete.date).catch((e: unknown) =>
+              toast.error(`Couldn't delete report: ${e instanceof Error ? e.message : "unknown error"}`),
+            )
+          }
         }}
       />
     </div>

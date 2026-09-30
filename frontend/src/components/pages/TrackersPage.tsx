@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { toast } from "sonner"
 import {
   Activity, ChevronLeft, ChevronRight, Dumbbell, Feather, Flame, CalendarDays, Trophy,
   Cookie, AlertTriangle, TrendingDown, Smartphone,
@@ -34,8 +35,8 @@ type ActivityDef = {
   hex: string // calendar dot fill
 }
 
-// Per-activity characteristics. Adding a tracker is one more entry here plus a
-// matching def in server/src/routes/trackers.js.
+// Per-activity characteristics. Adding a tracker is one more entry here; the
+// server stores entries for any tracker key.
 const ACTIVITIES: Record<ActivityKey, ActivityDef> = {
   gym: {
     key: "gym", label: "Gym", icon: Dumbbell, polarity: "good", goal: WEEK_GOAL,
@@ -240,7 +241,8 @@ export function TrackersPage() {
   const [calMonth, setCalMonth] = useState(now.getMonth())
 
   useEffect(() => {
-    if (!loaded) void hydrate()
+    // Failure leaves `loaded` false, so revisiting the page retries.
+    if (!loaded) hydrate().catch(() => toast.error("Couldn't load trackers — reopen the page to retry"))
   }, [hydrate, loaded])
 
   const activeDef = ACTIVITIES[activeActivity]

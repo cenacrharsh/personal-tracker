@@ -2,7 +2,14 @@ import { z } from "zod"
 
 // Shared building blocks. z.number() in zod v4 already rejects NaN/Infinity.
 const nonNeg = z.number().min(0)
-const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD")
+const datePattern = /^\d{4}-\d{2}-\d{2}$/
+const dateStr = z.string().regex(datePattern, "date must be YYYY-MM-DD")
+
+// For routes with a `:date` param.
+export function checkDateParam(req, res, next) {
+  if (!datePattern.test(req.params.date)) return res.status(400).json({ error: "date must be YYYY-MM-DD" })
+  next()
+}
 
 // Returns 400 with the first issue message on failure; replaces req.body with
 // the parsed data so unknown keys are stripped.
@@ -78,9 +85,6 @@ export const snapshotSchema = z.object({
 
 // --- cards ---
 
-// JSON month keys arrive as strings "1".."12".
-const monthMap = z.record(z.string().regex(/^([1-9]|1[0-2])$/, "month keys must be 1-12"), nonNeg)
-
 const cardConfigSchema = z.object({
   id: z.string().min(1, "card id is required"),
   name: z.string().max(200),
@@ -93,44 +97,33 @@ const cardConfigSchema = z.object({
   benefitsNote: z.string().max(2000).optional(),
 })
 
-export const cardsSchema = z.object({
-  creditCards: z.array(cardConfigSchema).default([]),
-  creditCardDataByYear: z
-    .record(
-      z.string().regex(/^\d{4}$/, "year keys must be YYYY"),
-      z.record(
-        z.string().min(1),
-        z.object({
-          cashback: monthMap.default({}),
-          expenses: monthMap.default({}),
-        }),
-      ),
-    )
-    .default({}),
+export const cardCreateSchema = cardConfigSchema
+export const cardPatchSchema = cardConfigSchema.omit({ id: true }).partial()
+
+export const cardMonthSchema = z.object({
+  year: z.number().int().min(2000).max(2100),
+  month: z.number().int().min(1).max(12),
+  field: z.enum(["cashback", "expenses"]),
+  value: nonNeg,
 })
 
 // --- bills ---
 
-const billStatus = z.object({
-  paid: z.boolean(),
-  paidAt: z.number().optional(),
-})
+// One row per paid bill; the key format depends on the kind.
+export const billKeyPatterns = {
+  card: /^\d{4}-\d{1,2}-.+$/, // `${year}-${month}-${cardId}`
+  insurance: /^\d{4}-(life|health)$/, // `${year}-${type}`
+}
 
-export const billsSchema = z.object({
-  creditCards: z.record(z.string().regex(/^\d{4}-\d{1,2}-.+$/, "card bill keys must be YYYY-M-cardId"), billStatus).default({}),
-  insurance: z.record(z.string().regex(/^\d{4}-(life|health)$/, "insurance keys must be YYYY-life|health"), billStatus).default({}),
+export const billPaidSchema = z.object({
+  paidAt: z.number().optional(),
 })
 
 // --- trackers ---
 
-export const trackersSchema = z.record(
-  z.string().regex(/^[\w-]{1,40}$/, "invalid tracker key"),
-  z.object({ entries: z.array(dateStr).default([]) }),
-)
+export const trackerKeyPattern = /^[\w-]{1,40}$/
 
 // --- vitals ---
-
-export const vitalsDateParam = /^\d{4}-\d{2}-\d{2}$/
 
 export const vitalsPutSchema = z.object({
   lab: z.string().max(500).optional(),

@@ -20,16 +20,25 @@ function toClient(doc) {
   return out
 }
 
-// GET current portfolio (null if never saved — frontend falls back to defaults).
+// GET the current portfolio. A user who has never saved gets the schema
+// defaults, so the client never needs its own copy of them.
 router.get("/", async (req, res) => {
   const doc = await Portfolio.findOne({ userId: req.userId })
-  res.json(doc ? toClient(doc) : null)
+  res.json(toClient(doc ?? new Portfolio({ userId: req.userId })))
 })
 
-// PUT the whole portfolio blob.
-router.put("/", validate(portfolioSchema), async (req, res) => {
+// PATCH only the fields that changed. Insurance sub-fields are set one by one
+// ("lifeInsurance.premium") so editing one never overwrites the others.
+router.patch("/", validate(portfolioSchema), async (req, res) => {
   const update = {}
-  for (const f of FIELDS) if (f in req.body) update[f] = req.body[f]
+  for (const f of FIELDS) {
+    if (!(f in req.body)) continue
+    if (f === "lifeInsurance" || f === "healthInsurance") {
+      for (const [k, v] of Object.entries(req.body[f])) update[`${f}.${k}`] = v
+    } else {
+      update[f] = req.body[f]
+    }
+  }
   const doc = await Portfolio.findOneAndUpdate(
     { userId: req.userId },
     { $set: update, $setOnInsert: { userId: req.userId } },

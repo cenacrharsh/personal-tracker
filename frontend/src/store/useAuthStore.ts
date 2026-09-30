@@ -54,7 +54,9 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 }))
 
-// Fired by the api client on a 401 from any non-auth route.
+// Fired by the api client on a 401 from any non-auth route. Reload (as logout
+// does) rather than just flipping to the login screen: the data stores would
+// otherwise keep this session's data cached into the next login.
 window.addEventListener("api:unauthorized", () => {
-  useAuthStore.setState({ user: null, status: "anon" })
+  window.location.reload()
 })

@@ -24,17 +24,22 @@ export const useTrackersStore = create<TrackersState>()((set, get) => ({
 
   hydrate: async () => {
     const data = await repository.getTrackers()
-    set({ trackers: data ?? {}, loaded: true })
+    set({ trackers: data, loaded: true })
   },
 
-  toggleDay: (activity, date) =>
+  toggleDay: (activity, date) => {
+    // Until the saved days arrive, a tap would be overwritten by them.
+    if (!get().loaded) return
+    const marked = get().isActiveDay(activity, date)
     set((s) => {
       const entries = s.trackers[activity]?.entries ?? NO_ENTRIES
-      const next = entries.includes(date)
-        ? entries.filter((d) => d !== date)
-        : [...entries, date].sort()
+      const next = marked ? entries.filter((d) => d !== date) : [...entries, date].sort()
       return { trackers: { ...s.trackers, [activity]: { entries: next } } }
-    }),
+    })
+    trackSave(`tracker:${activity}:${date}`, () =>
+      marked ? repository.unmarkTrackerDay(activity, date) : repository.markTrackerDay(activity, date),
+    )
+  },
 
   entriesFor: (activity) => get().trackers[activity]?.entries ?? NO_ENTRIES,
 
@@ -45,24 +50,3 @@ export const useTrackersStore = create<TrackersState>()((set, get) => ({
       .entriesFor(activity)
       .filter((d) => d >= start && d <= end),
 }))
-
-// Debounced auto-save
-let saveTimer: ReturnType<typeof setTimeout> | null = null
-let fingerprint = ""
-
-useTrackersStore.subscribe((state) => {
-  if (!state.loaded) return
-  const fp = JSON.stringify(state.trackers)
-  if (fp === fingerprint) return
-  fingerprint = fp
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    const s = useTrackersStore.getState()
-    trackSave(
-      () => repository.saveTrackers(s.trackers),
-      () => {
-        fingerprint = ""
-      },
-    )
-  }, 400)
-})

@@ -7,7 +7,7 @@ accounts never see each other's data.
 ## Collections
 
 `users`, `portfolios`, `creditcards`, `cardmonthlies`, `snapshots`,
-`billpayments`, `trackerdefs`, `trackerentries`.
+`billpayments`, `trackerentries`, `vitalsreports`.
 
 ## Setup
 
@@ -28,9 +28,16 @@ accounts never see each other's data.
 Auth (public): `POST /api/auth/signup`, `POST /api/auth/login`,
 `POST /api/auth/logout`, `GET /api/auth/me`.
 
-Data (require auth cookie): `GET|PUT /api/portfolio`, `GET|PUT /api/cards`,
-`GET /api/snapshots` + `POST /api/snapshots`, `GET|PUT /api/bills`,
-`GET|PUT /api/trackers`, `POST /api/data/reset`.
+Data (require auth cookie). Each write changes one item and nothing else:
+
+- `GET /api/portfolio`, `PATCH /api/portfolio` (only the changed fields)
+- `GET /api/cards`, `POST /api/cards`, `PATCH|DELETE /api/cards/:cardId`,
+  `PUT /api/cards/:cardId/months` (one month's cashback or spend)
+- `GET /api/bills`, `PUT|DELETE /api/bills/:kind/:key` (mark paid / unpaid)
+- `GET /api/trackers`, `PUT|DELETE /api/trackers/:key/:date` (mark / unmark a day)
+- `GET /api/snapshots`, `POST /api/snapshots`
+- `GET /api/vitals`, `PUT|DELETE /api/vitals/:date`
+- `POST /api/data/reset`
 
 ## Test
 

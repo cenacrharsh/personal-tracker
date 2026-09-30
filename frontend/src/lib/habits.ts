@@ -1,15 +1,10 @@
-import { toDateKey } from "@/lib/dates"
+import { parseDateKey as parseKey, toDateKey } from "@/lib/dates"
 
 // Math for "avoid" trackers. Only lapses are ever recorded — an unlogged day is
 // unknown, not proven clean — so everything here is phrased against the log:
 // how long since the last recorded lapse, and the longest recorded gap.
 
 const DAY_MS = 86_400_000
-
-function parseKey(key: string): Date {
-  const [y, m, d] = key.split("-").map(Number)
-  return new Date(y, m - 1, d)
-}
 
 export function shiftKey(key: string, days: number): string {
   const d = parseKey(key)

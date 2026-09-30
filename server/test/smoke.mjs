@@ -4,10 +4,10 @@ const PORT = 4555
 const BASE = `http://localhost:${PORT}/api`
 
 let cookie = ""
-async function call(path, { method = "GET", body } = {}) {
+async function call(path, { method = "GET", body, headers = {} } = {}) {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },
+    headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined,
   })
   const setCookie = res.headers.get("set-cookie")
@@ -59,52 +59,86 @@ assert(r.status === 201 && r.json.user.email === "you@example.com", "signup crea
 r = await call("/auth/signup", { method: "POST", body: { name: "You", email: "you@example.com", password: "secret123" } })
 assert(r.status === 409, "duplicate signup returns 409")
 
-// 3. authed portfolio is null initially, then round-trips
+// 3. portfolio: defaults before first save, then per-field PATCH
 r = await call("/portfolio")
-assert(r.status === 200 && r.json === null, "portfolio null before first save")
+assert(r.status === 200 && r.json.age === 30 && r.json.lifeInsurance.enabled === true, "portfolio GET returns schema defaults before first save")
 
-r = await call("/portfolio", { method: "PUT", body: { age: 31, monthlyIncome: 200000, fdAmount: 5000 } })
-assert(r.status === 200 && r.json.age === 31 && r.json.fdAmount === 5000, "portfolio PUT persists")
+r = await call("/portfolio", { method: "PATCH", body: { age: 31, monthlyIncome: 200000, fdAmount: 5000 } })
+assert(r.status === 200 && r.json.age === 31 && r.json.fdAmount === 5000, "portfolio PATCH persists")
 
+r = await call("/portfolio", { method: "PATCH", body: { rdAmount: 700 } })
+assert(r.json.rdAmount === 700 && r.json.fdAmount === 5000 && r.json.age === 31, "portfolio PATCH leaves other fields alone")
+
+r = await call("/portfolio", { method: "PATCH", body: { lifeInsurance: { premium: 1200 } } })
+r = await call("/portfolio", { method: "PATCH", body: { lifeInsurance: { coverAmount: 5000000 } } })
+assert(r.json.lifeInsurance.premium === 1200 && r.json.lifeInsurance.coverAmount === 5000000, "insurance sub-field PATCHes don't overwrite each other")
+
+r = await call("/portfolio", { method: "PATCH", body: { fdAmount: -100 } })
+assert(r.status === 400 && typeof r.json.error === "string", "portfolio PATCH with negative number is 400")
 r = await call("/portfolio")
-assert(r.status === 200 && r.json.monthlyIncome === 200000, "portfolio GET returns saved data")
+assert(r.json.fdAmount === 5000, "invalid portfolio PATCH did not persist")
 
-r = await call("/portfolio", { method: "PUT", body: { fdAmount: -100 } })
-assert(r.status === 400 && typeof r.json.error === "string", "portfolio PUT with negative number is 400")
-r = await call("/portfolio")
-assert(r.json.fdAmount === 5000, "invalid portfolio PUT did not persist")
+// 4. cards: create, patch settings, set month cells, delete
+const card = { id: "sbi", name: "SBI", anniversaryStartMonth: 1, feeWaiverTarget: 0, status: "active", annualFeeType: "ltf", annualFeeAmount: 0, creditLimit: 0, benefitsNote: "" }
+r = await call("/cards", { method: "POST", body: card })
+assert(r.status === 201 && r.json.id === "sbi", "card POST creates a card")
+r = await call("/cards", { method: "POST", body: { ...card, id: "hdfc", name: "HDFC" } })
+assert(r.status === 201, "second card POST ok")
+r = await call("/cards", { method: "POST", body: { ...card, name: "Renamed" } })
+assert(r.status === 201 && r.json.name === "SBI", "repeating a card POST is safe and leaves the card as it was")
 
-// 4. cards round-trip (config + monthly assembled back)
-r = await call("/cards", {
-  method: "PUT",
-  body: {
-    creditCards: [{ id: "sbi", name: "SBI", anniversaryStartMonth: 1, feeWaiverTarget: 0, status: "active", annualFeeType: "ltf", annualFeeAmount: 0, creditLimit: 0, benefitsNote: "" }],
-    creditCardDataByYear: { 2026: { sbi: { cashback: { 1: 100 }, expenses: { 1: 5000 } } } },
-  },
-})
-assert(r.status === 200, "cards PUT ok")
+r = await call("/cards/sbi", { method: "PATCH", body: { creditLimit: 100000 } })
+assert(r.status === 200 && r.json.creditLimit === 100000 && r.json.name === "SBI", "card PATCH changes only the posted setting")
+r = await call("/cards/nope", { method: "PATCH", body: { creditLimit: 1 } })
+assert(r.status === 404, "PATCH of an unknown card is 404")
+
+r = await call("/cards/sbi/months", { method: "PUT", body: { year: 2026, month: 1, field: "cashback", value: 100 } })
+assert(r.status === 200, "card month PUT ok")
+await call("/cards/sbi/months", { method: "PUT", body: { year: 2026, month: 1, field: "expenses", value: 5000 } })
+await call("/cards/sbi/months", { method: "PUT", body: { year: 2026, month: 2, field: "expenses", value: 3000 } })
+r = await call("/cards/sbi/months", { method: "PUT", body: { year: 2026, month: 13, field: "expenses", value: 1 } })
+assert(r.status === 400, "card month PUT with month 13 is 400")
+r = await call("/cards/nope/months", { method: "PUT", body: { year: 2026, month: 1, field: "expenses", value: 1 } })
+assert(r.status === 404, "month PUT for an unknown card is 404")
 r = await call("/cards")
-assert(r.json.creditCards.length === 1 && r.json.creditCards[0].id === "sbi", "cards GET returns config")
-assert(r.json.creditCardDataByYear["2026"].sbi.cashback["1"] === 100, "cards GET returns monthly data")
+assert(!r.json.creditCardDataByYear["2026"]?.nope, "month PUT for an unknown card leaves no row behind")
 
-// 5. trackers round-trip (gym + badminton, distinct days)
-r = await call("/trackers", {
-  method: "PUT",
-  body: {
-    gym: { entries: ["2026-05-01", "2026-05-03", "2026-05-05"] },
-    badminton: { entries: ["2026-05-02", "2026-05-04"] },
-  },
-})
-assert(r.status === 200, "trackers PUT ok")
+r = await call("/cards")
+assert(r.json.creditCards.length === 2, "cards GET returns both cards")
+const sbi2026 = r.json.creditCardDataByYear["2026"].sbi
+assert(sbi2026.cashback["1"] === 100 && sbi2026.expenses["1"] === 5000 && sbi2026.expenses["2"] === 3000, "month cells are set independently")
+
+r = await call("/cards/hdfc", { method: "DELETE" })
+assert(r.status === 200, "card DELETE ok")
+r = await call("/cards")
+assert(r.json.creditCards.length === 1 && r.json.creditCards[0].id === "sbi", "deleting one card leaves the other")
+
+// 5. trackers: mark and unmark single days
+for (const d of ["2026-05-01", "2026-05-03", "2026-05-05"]) await call(`/trackers/gym/${d}`, { method: "PUT" })
+await call("/trackers/badminton/2026-05-02", { method: "PUT" })
+r = await call("/trackers/gym/2026-05-03", { method: "PUT" })
+assert(r.status === 200, "marking an already-marked day is ok (idempotent)")
+r = await call("/trackers/gym/2026-05-05", { method: "DELETE" })
+assert(r.status === 200, "tracker DELETE ok")
+r = await call("/trackers/gym/not-a-date", { method: "PUT" })
+assert(r.status === 400, "tracker PUT with malformed date is 400")
 r = await call("/trackers")
-assert(r.json.gym.entries.length === 3 && r.json.gym.entries.includes("2026-05-03"), "trackers GET returns gym entries")
-assert(r.json.badminton.entries.length === 2 && r.json.badminton.entries.includes("2026-05-04"), "trackers GET returns badminton entries")
+assert(r.json.gym.entries.join() === "2026-05-01,2026-05-03", "trackers GET returns remaining gym entries")
+assert(r.json.badminton.entries.join() === "2026-05-02", "trackers GET returns badminton entries")
 
-// 6. bills round-trip
-r = await call("/bills", { method: "PUT", body: { creditCards: { "2026-1-sbi": { paid: true, paidAt: 123 } }, insurance: {} } })
-assert(r.status === 200, "bills PUT ok")
+// 6. bills: mark paid / unpaid
+r = await call("/bills/card/2026-1-sbi", { method: "PUT", body: { paidAt: 123 } })
+assert(r.status === 200, "bill PUT ok")
+await call("/bills/insurance/2026-life", { method: "PUT", body: { paidAt: 456 } })
+r = await call("/bills/insurance/2026-dental", { method: "PUT", body: {} })
+assert(r.status === 400, "bill PUT with an invalid key is 400")
+r = await call("/bills/constructor/x", { method: "PUT", body: {} })
+assert(r.status === 400, "bill PUT with an inherited property name as kind is 400")
 r = await call("/bills")
-assert(r.json.creditCards["2026-1-sbi"].paid === true, "bills GET returns paid status")
+assert(r.json.creditCards["2026-1-sbi"].paid === true && r.json.insurance["2026-life"].paidAt === 456, "bills GET returns paid status")
+await call("/bills/card/2026-1-sbi", { method: "DELETE" })
+r = await call("/bills")
+assert(!r.json.creditCards["2026-1-sbi"] && r.json.insurance["2026-life"], "bill DELETE unmarks only that bill")
 
 // 7. snapshots
 r = await call("/snapshots", { method: "POST", body: { date: "2026-05-29", ts: 1000, netWorth: 50000, equity: 30000, gold: 10000, silver: 5000, debt: 5000, emergencyFund: 20000 } })
@@ -138,28 +172,40 @@ assert(r.status === 400, "vitals PUT with malformed date param is 400")
 r = await call("/vitals/2026-01-01", { method: "DELETE" })
 assert(r.status === 200, "vitals DELETE ok")
 r = await call("/vitals/2026-01-01", { method: "DELETE" })
-assert(r.status === 404, "deleting an already-deleted report is 404")
+assert(r.status === 200, "deleting an already-deleted report is a safe no-op")
 
 // 8. isolation: a second user sees none of the first user's data
 cookie = ""
 r = await call("/auth/signup", { method: "POST", body: { name: "Her", email: "her@example.com", password: "secret123" } })
 assert(r.status === 201, "second user signup")
 r = await call("/portfolio")
-assert(r.json === null, "second user has isolated (empty) portfolio")
+assert(r.json.fdAmount === 0, "second user has isolated (default) portfolio")
 r = await call("/trackers")
-assert(r.json.gym.entries.length === 0, "second user has isolated (empty) trackers")
+assert(Object.keys(r.json).length === 0, "second user has isolated (empty) trackers")
+await call("/cards/sbi", { method: "DELETE" })
 r = await call("/vitals")
 assert(Array.isArray(r.json) && r.json.length === 0, "second user has isolated (empty) vitals")
-r = await call("/vitals/2025-06-01", { method: "DELETE" })
-assert(r.status === 404, "second user cannot delete first user's vitals report")
+await call("/vitals/2025-06-01", { method: "DELETE" })
 
 // 9. reset wipes current user's data
 r = await call("/auth/login", { method: "POST", body: { email: "you@example.com", password: "secret123" } })
 assert(r.status === 200, "login back as first user")
+r = await call("/vitals")
+assert(r.json.some((v) => v.date === "2025-06-01"), "second user's DELETE did not remove first user's vitals report")
+r = await call("/cards")
+assert(r.json.creditCards.some((c) => c.id === "sbi"), "second user's DELETE did not remove first user's card")
+r = await call("/data/reset", { method: "POST", headers: { Origin: "https://evil.example" } })
+assert(r.status === 403, "reset from a foreign origin is rejected (CSRF)")
+r = await call("/vitals")
+assert(r.json.length > 0, "rejected cross-origin reset left data intact")
+r = await call("/data/reset", { method: "POST", headers: { Origin: "http://localhost:5173" } })
+assert(r.status === 200, "reset from the allowed origin passes the CSRF guard")
 r = await call("/data/reset", { method: "POST" })
 assert(r.status === 200, "reset ok")
 r = await call("/portfolio")
-assert(r.json === null, "portfolio cleared after reset")
+assert(r.json.fdAmount === 0, "portfolio back to defaults after reset")
+r = await call("/cards")
+assert(r.json.creditCards.length === 0, "cards cleared after reset")
 r = await call("/vitals")
 assert(r.json.length === 0, "vitals cleared after reset")
 

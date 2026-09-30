@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { ChevronDown } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -48,7 +49,7 @@ export function ReportDialog({
   }
 
   const isEditing = report !== null
-  const isDuplicateDate = !isEditing && existingDates.includes(date)
+  const isDuplicateDate = date !== report?.date && existingDates.includes(date)
 
   const defaultOpenPanels = useMemo(() => {
     const set = new Set<string>()
@@ -77,6 +78,8 @@ export function ReportDialog({
     try {
       await onSave({ date, lab: lab.trim(), notes: notes.trim(), results })
       onOpenChange(false)
+    } catch (e) {
+      toast.error(`Couldn't save report: ${e instanceof Error ? e.message : "unknown error"}`)
     } finally {
       setSaving(false)
     }
@@ -99,7 +102,7 @@ export function ReportDialog({
             </Label>
             <Input id="vitals-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             {isDuplicateDate ? (
-              <p className="text-[11px] text-amber-300">A report exists for this date — saving will update it.</p>
+              <p className="text-[11px] text-amber-300">A report exists for this date — saving will replace it.</p>
             ) : null}
           </div>
           <div className="grid gap-1.5">

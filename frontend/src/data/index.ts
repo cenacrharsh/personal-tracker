@@ -1,8 +1,5 @@
-import { ApiAdapter } from "./apiAdapter"
-import type { PortfolioRepository } from "./repository"
-
 // Single source of truth: Express + MongoDB.
-export const repository: PortfolioRepository = new ApiAdapter()
+export { repository, type BillKind, type PortfolioPatch } from "./repository"
 
 export { DEFAULT_PORTFOLIO, DEFAULT_BILLS } from "./defaults"
 export type {
@@ -23,4 +20,3 @@ export type {
   VitalMetricDef,
   VitalPanel,
 } from "./types"
-export type { PortfolioRepository } from "./repository"

@@ -14,6 +14,7 @@ import {
 
 import type { VitalsReport } from "@/data/types"
 import { PANEL_LABELS, VITALS_CATALOG } from "@/lib/vitalsCatalog"
+import { parseDateKey } from "@/lib/dates"
 import { formatMetricValue, formatRange, metricStatus, STATUS_LABEL, STATUS_TONE_CLASS } from "@/lib/vitals"
 import {
   AXIS_TICK,
@@ -25,7 +26,7 @@ import {
 import { EmptyState } from "@/components/primitives/EmptyState"
 
 function formatShortDate(dateStr: string): string {
-  const d = new Date(dateStr)
+  const d = parseDateKey(dateStr)
   if (Number.isNaN(d.getTime())) return dateStr
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })
 }

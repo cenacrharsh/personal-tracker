@@ -7,8 +7,7 @@ const router = Router()
 
 const FIELDS = ["date", "ts", "netWorth", "equity", "gold", "silver", "debt", "emergencyFund"]
 
-// Keep at most this many snapshots per user (~2 years of daily points),
-// matching the client-side localStorage cap.
+// Keep at most this many snapshots per user (~2 years of daily points).
 const MAX_SNAPSHOTS = 730
 
 function toClient(doc) {

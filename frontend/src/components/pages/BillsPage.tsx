@@ -9,7 +9,7 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { YearPicker } from "@/components/primitives/YearPicker"
-import { MONTHS } from "@/lib/dates"
+import { MONTHS, parseDateKey } from "@/lib/dates"
 import { formatCompactINR, formatINR } from "@/lib/money"
 import { ccBillKey, insuranceBillKey, usePortfolioStore } from "@/store/usePortfolioStore"
 
@@ -34,7 +34,7 @@ export function BillsPage() {
   const billingYear = billingDate.getFullYear()
   const billingMonth = billingDate.getMonth() + 1
 
-  const periodStart = new Date(billingYear, billingMonth - 1, 12)
+  const periodStart = new Date(billingYear, billingMonth - 1, 13)
   const periodEnd = new Date(billingYear, billingMonth, 12)
   const fmtPeriod = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]}`
   const periodLabel = `${fmtPeriod(periodStart)} – ${fmtPeriod(periodEnd)}`
@@ -62,8 +62,8 @@ export function BillsPage() {
   const lifeDue = lifeInsurance.enabled
   const healthDue = healthInsurance.enabled
   const showInsurance = lifeDue || healthDue
-  const lifePayable = new Date(lifeInsurance.renewalDate).getFullYear() === year
-  const healthPayable = new Date(healthInsurance.renewalDate).getFullYear() === year
+  const lifePayable = parseDateKey(lifeInsurance.renewalDate).getFullYear() === year
+  const healthPayable = parseDateKey(healthInsurance.renewalDate).getFullYear() === year
 
   const isThisYear = year === today.getFullYear()
 

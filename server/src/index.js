@@ -43,6 +43,14 @@ const app = express()
 app.set("trust proxy", 1)
 app.use(helmet())
 app.use(cors({ origin: corsOrigin, credentials: true }))
+// CSRF guard. The auth cookie is SameSite=None in production, so a form on any
+// site can send it; CORS only hides the response, the request still runs.
+// Browsers always attach Origin to cross-site writes, so reject unknown ones.
+app.use((req, res, next) => {
+  const origin = req.get("origin")
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method) || !origin || origins.includes(origin)) return next()
+  res.status(403).json({ error: "Origin not allowed" })
+})
 app.use(express.json({ limit: "2mb" }))
 app.use(cookieParser())
 
