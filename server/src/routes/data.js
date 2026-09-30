@@ -8,6 +8,8 @@ import { Snapshot } from "../models/Snapshot.js"
 import { BillPayment } from "../models/BillPayment.js"
 import { TrackerEntry } from "../models/TrackerEntry.js"
 import { VitalsReport } from "../models/VitalsReport.js"
+import { VisitedState } from "../models/VisitedState.js"
+import { VisitedCity } from "../models/VisitedCity.js"
 
 const router = Router()
 
@@ -19,10 +21,12 @@ const deleteAll = (userId, session) => Promise.all([
   BillPayment.deleteMany({ userId }, { session }),
   TrackerEntry.deleteMany({ userId }, { session }),
   VitalsReport.deleteMany({ userId }, { session }),
+  VisitedState.deleteMany({ userId }, { session }),
+  VisitedCity.deleteMany({ userId }, { session }),
 ])
 
 // Wipe all of the current user's data (account itself is kept).
-// Uses a transaction so the wipe across 7 collections is all-or-nothing;
+// Uses a transaction so the wipe across 9 collections is all-or-nothing;
 // falls back to a plain Promise.all on standalone Mongo (no replica set),
 // which doesn't support transactions.
 router.post("/reset", async (req, res) => {

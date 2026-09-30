@@ -132,3 +132,15 @@ export const vitalsPutSchema = z.object({
     .record(z.string().regex(/^[a-z0-9-]{1,40}$/, "invalid metric key"), z.number().positive("metric values must be > 0"))
     .refine((r) => Object.keys(r).length <= 60, "too many metrics"),
 })
+
+// --- travel ---
+
+export const regionCodePattern = /^[A-Z]{2}$/
+export const cityIdPattern = /^(gn|osm):[\w-]{1,40}$/
+
+export const travelCityPutSchema = z.object({
+  name: z.string().trim().min(1, "name is required").max(100),
+  stateCode: z.string().regex(regionCodePattern, "invalid state code"),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+})

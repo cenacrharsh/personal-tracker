@@ -16,6 +16,7 @@ import billsRoutes from "./routes/bills.js"
 import trackersRoutes from "./routes/trackers.js"
 import dataRoutes from "./routes/data.js"
 import vitalsRoutes from "./routes/vitals.js"
+import travelRoutes from "./routes/travel.js"
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   console.error("JWT_SECRET is missing or too short — set a random string of at least 32 characters (see .env.example).")
@@ -83,6 +84,7 @@ app.use("/api/bills", requireAuth, billsRoutes)
 app.use("/api/trackers", requireAuth, trackersRoutes)
 app.use("/api/data", requireAuth, dataRoutes)
 app.use("/api/vitals", requireAuth, vitalsRoutes)
+app.use("/api/travel", requireAuth, travelRoutes)
 
 // Centralized error handler so async throws return JSON, not HTML.
 app.use((err, req, res, _next) => {
