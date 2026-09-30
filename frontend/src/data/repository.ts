@@ -7,6 +7,8 @@ import type {
   PortfolioData,
   Snapshot,
   TrackersData,
+  TravelData,
+  VisitedCity,
   VitalsReport,
 } from "./types"
 
@@ -57,6 +59,17 @@ export const repository = {
   upsertVitalsReport: (report: VitalsReport) =>
     api<void>(`/vitals/${report.date}`, json("PUT", { lab: report.lab, notes: report.notes, results: report.results })),
   deleteVitalsReport: (date: string) => api<void>(`/vitals/${date}`, json("DELETE")),
+
+  getTravel: () => api<TravelData>("/travel"),
+  markTravelState: (code: string) => api<void>(`/travel/states/${code}`, json("PUT")),
+  // Also removes the state's cities on the server.
+  unmarkTravelState: (code: string) => api<void>(`/travel/states/${code}`, json("DELETE")),
+  saveTravelCity: (city: VisitedCity) =>
+    api<void>(
+      `/travel/cities/${encodeURIComponent(city.id)}`,
+      json("PUT", { name: city.name, stateCode: city.stateCode, lat: city.lat, lng: city.lng }),
+    ),
+  deleteTravelCity: (id: string) => api<void>(`/travel/cities/${encodeURIComponent(id)}`, json("DELETE")),
 
   reset: () => api<void>("/data/reset", json("POST")),
 }

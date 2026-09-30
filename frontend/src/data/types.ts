@@ -121,3 +121,16 @@ export type VitalMetricDef = {
   core?: boolean // the 11 Notion metrics — always visible in the matrix
   decimals?: number // display precision, default 1
 }
+
+export type VisitedCity = {
+  id: string // "gn:<geonameid>"
+  name: string
+  stateCode: string // region code from lib/indiaRegions.ts
+  lat: number
+  lng: number
+}
+
+export type TravelData = {
+  states: string[] // region codes marked directly; cities mark their state implicitly
+  cities: VisitedCity[]
+}

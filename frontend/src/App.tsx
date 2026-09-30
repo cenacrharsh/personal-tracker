@@ -12,6 +12,7 @@ import { BillsPage } from "@/components/pages/BillsPage"
 import { SettingsPage } from "@/components/pages/SettingsPage"
 import { TrackersPage } from "@/components/pages/TrackersPage"
 import { VitalsPage } from "@/components/pages/VitalsPage"
+import { TravelPage } from "@/components/pages/TravelPage"
 import { AuthPage } from "@/components/pages/AuthPage"
 import { usePortfolioStore } from "@/store/usePortfolioStore"
 import { useVitalsStore } from "@/store/useVitalsStore"
@@ -76,6 +77,7 @@ export default function App() {
             <Route path="/bills" component={BillsPage} />
             <Route path="/trackers" component={TrackersPage} />
             <Route path="/vitals" component={VitalsPage} />
+            <Route path="/travel" component={TravelPage} />
             <Route path="/settings" component={SettingsPage} />
             <Route>
               <Redirect to="/" />

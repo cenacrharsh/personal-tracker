@@ -47,3 +47,19 @@ export const CHART_PALETTE = [
   "#0ea5e9",
   "#fb923c",
 ]
+
+// Travel map: each visited state/UT wears its own colour from the chart
+// palette (all >= 3:1 against the unvisited fill), picked so neighbours differ.
+export const TRAVEL_UNVISITED = "#262c34"
+export const TRAVEL_STATE_COLORS = CHART_PALETTE
+// Palette entries that read alike; the map keeps them off neighbouring states.
+const SIMILAR_COLOR_PAIRS = [
+  ["#6366f1", "#a855f7"],
+  ["#06b6d4", "#0ea5e9"],
+  ["#ec4899", "#f43f5e"],
+  ["#f59e0b", "#fb923c"],
+]
+export function travelColorsSimilar(a: number, b: number) {
+  const [x, y] = [TRAVEL_STATE_COLORS[a], TRAVEL_STATE_COLORS[b]]
+  return SIMILAR_COLOR_PAIRS.some(([p, q]) => (x === p && y === q) || (x === q && y === p))
+}

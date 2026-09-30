@@ -19,6 +19,7 @@ import { todayKey } from "@/lib/dates"
 import { debounceSave, discardFailedSaves, flushSaves, trackSave } from "@/store/useSyncStore"
 import { useTrackersStore } from "@/store/useTrackersStore"
 import { useVitalsStore } from "@/store/useVitalsStore"
+import { useTravelStore } from "@/store/useTravelStore"
 
 export type {
   CreditCardConfig,
@@ -406,6 +407,7 @@ export const usePortfolioStore = create<PortfolioState>()((set, get) => {
       // Trackers refetch on next visit.
       useTrackersStore.setState({ trackers: {}, loaded: false })
       useVitalsStore.setState({ reports: [] })
+      useTravelStore.setState({ states: [], cities: [], loaded: false })
       // Then load the server's defaults; the screen is already cleared if this fails.
       await get().hydrate().catch(() => {})
     },

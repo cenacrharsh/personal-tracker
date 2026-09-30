@@ -19,4 +19,6 @@ export type {
   MetricRange,
   VitalMetricDef,
   VitalPanel,
+  VisitedCity,
+  TravelData,
 } from "./types"

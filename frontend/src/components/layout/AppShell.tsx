@@ -6,6 +6,7 @@ import {
   HeartPulse,
   LayoutDashboard,
   ListChecks,
+  Plane,
   Settings,
   Wallet,
 } from "lucide-react"
@@ -19,6 +20,7 @@ const NAV: { path: string; label: string; icon: typeof LayoutDashboard }[] = [
   { path: "/bills", label: "Bills", icon: ListChecks },
   { path: "/trackers", label: "Trackers", icon: Dumbbell },
   { path: "/vitals", label: "Vitals", icon: HeartPulse },
+  { path: "/travel", label: "Travel", icon: Plane },
   { path: "/settings", label: "Settings", icon: Settings },
 ]
 
@@ -90,7 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-background/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
-        <div className="grid grid-cols-7">
+        <div className="grid grid-cols-8">
           {NAV.map(({ path, label, icon: Icon }) => {
             const active = isActive(path)
             return (
