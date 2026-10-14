@@ -188,7 +188,7 @@ export function AddCityDialog({
               <select
                 value={pickedState}
                 onChange={(e) => setPickedState(e.target.value)}
-                className="h-11 w-full rounded-lg border border-input bg-input/30 px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="h-11 w-full rounded-lg border border-input bg-input/30 px-3 pr-9 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {pickedState ? null : (
                   <option value="" disabled>
